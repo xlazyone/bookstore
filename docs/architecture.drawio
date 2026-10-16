@@ -1,0 +1,1069 @@
+<mxfile host="app.diagrams.net" pages="2">
+  <diagram name="Страница-1" id="c8fBYadRwe4HuS_QQ2zO">
+    <mxGraphModel dx="2188" dy="909" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <UserObject label="" mermaidData="{&#xa;  &quot;data&quot;: &quot;flowchart TB\n    Client[\&quot;👤 Client\&quot;]\n    GW[\&quot;API Gateway (Nginx)\&quot;]\n    KC[\&quot;Keycloak\&quot;]\n\n    subgraph Services[\&quot;Бизнес-сервисы\&quot;]\n        Cat[\&quot;catalog-service\&quot;]\n        Inv[\&quot;inventory-service\&quot;]\n        Ord[\&quot;order-service\&quot;]\n        Pay[\&quot;payment-service\&quot;]\n        Rev[\&quot;review-service\&quot;]\n        Not[\&quot;notification-service\&quot;]\n    end\n\n    subgraph Storage[\&quot;Хранилища\&quot;]\n        CatPG[(\&quot;PostgreSQL catalog\&quot;)]\n        InvPG[(\&quot;PostgreSQL inventory\&quot;)]\n        OrdPG[(\&quot;PostgreSQL order\&quot;)]\n        PayPG[(\&quot;PostgreSQL payment\&quot;)]\n        RevM[(\&quot;MongoDB review\&quot;)]\n        NotM[(\&quot;MongoDB notification\&quot;)]\n        CatR[(\&quot;Redis catalog\&quot;)]\n        InvR[(\&quot;Redis inventory\&quot;)]\n        S3[(\&quot;MinIO covers\&quot;)]\n    end\n\n    MQ[(\&quot;RabbitMQ\&quot;)]\n    PG[\&quot;Payment Gateway (external)\&quot;]\n    MH[\&quot;MailHog (dev SMTP)\&quot;]\n\n    %% Client → Gateway\n    Client --&gt;|\&quot;HTTPS: /api/v1/**\&quot;| GW\n    GW -.-&gt;|\&quot;HTTPS: verify JWT\&quot;| KC\n\n    %% Gateway → public endpoints\n    GW --&gt;|\&quot;REST: /api/v1/books\&quot;| Cat\n    GW --&gt;|\&quot;REST: /api/v1/admin/books,&lt;br/&gt;/api/v1/admin/stock\&quot;| Inv\n    GW --&gt;|\&quot;REST: /api/v1/orders\&quot;| Ord\n    GW --&gt;|\&quot;REST: /api/v1/payments/{id}\&quot;| Pay\n    GW --&gt;|\&quot;REST: /api/v1/books/{id}/reviews\&quot;| Rev\n\n    %% Service-to-service (sync, internal)\n    Ord --&gt;|\&quot;REST: GET /internal/v1/books:batch\&quot;| Cat\n    Ord --&gt;|\&quot;REST: POST /internal/v1/reservations\&quot;| Inv\n    Ord --&gt;|\&quot;REST: POST /internal/v1/payments\&quot;| Pay\n\n    %% Async: publishers\n    Ord -.-&gt;|\&quot;publish:&lt;br/&gt;order.created, order.confirmed,&lt;br/&gt;order.cancelled, order.expired\&quot;| MQ\n    Pay -.-&gt;|\&quot;publish:&lt;br/&gt;payment.completed, payment.failed,&lt;br/&gt;payment.refunded\&quot;| MQ\n    Inv -.-&gt;|\&quot;publish:&lt;br/&gt;stock.reserved, stock.released,&lt;br/&gt;stock.reservation.expired\&quot;| MQ\n    Rev -.-&gt;|\&quot;publish: review.published\&quot;| MQ\n    Not -.-&gt;|\&quot;publish:&lt;br/&gt;notification.sent, notification.failed\&quot;| MQ\n\n    %% Async: subscribers\n    MQ -.-&gt;|\&quot;subscribe:&lt;br/&gt;payment.completed, payment.failed\&quot;| Ord\n    MQ -.-&gt;|\&quot;subscribe: order.expired\&quot;| Pay\n    MQ -.-&gt;|\&quot;subscribe:&lt;br/&gt;order.confirmed, order.cancelled\&quot;| Inv\n    MQ -.-&gt;|\&quot;subscribe: order.confirmed\&quot;| Rev\n    MQ -.-&gt;|\&quot;subscribe:&lt;br/&gt;order.confirmed, order.cancelled,&lt;br/&gt;payment.completed, payment.failed,&lt;br/&gt;review.published\&quot;| Not\n\n    %% External\n    Pay --&gt;|\&quot;HTTPS: POST /payments\&quot;| PG\n    PG -.-&gt;|\&quot;HTTPS webhook\&quot;| Pay\n    Not --&gt;|\&quot;SMTP: send\&quot;| MH\n\n    %% Storage\n    Cat --&gt; CatPG\n    Cat --&gt; CatR\n    Cat --&gt; S3\n    Inv --&gt; InvPG\n    Inv --&gt; InvR\n    Ord --&gt; OrdPG\n    Pay --&gt; PayPG\n    Rev --&gt; RevM\n    Not --&gt; NotM\n\n    classDef svc fill:#dae8fc,stroke:#6c8ebf,color:#000\n    classDef db fill:#d5e8d4,stroke:#82b366,color:#000\n    classDef infra fill:#fff2cc,stroke:#d6b656,color:#000\n    classDef ext fill:#f8cecc,stroke:#b85450,color:#000\n\n    class Cat,Inv,Ord,Pay,Rev,Not svc\n    class CatPG,InvPG,OrdPG,PayPG,RevM,NotM,CatR,InvR,S3 db\n    class GW,KC,MQ infra\n    class PG,MH,Client ext&quot;,&#xa;  &quot;config&quot;: null,&#xa;  &quot;version&quot;: &quot;12&quot;&#xa;}" id="jrwpsjGuzLij1hNiOoy2-1">
+          <mxCell connectable="0" parent="1" style="group;transparentBounds=1;editIcon=1;lockedGroup=0;groupPadding=10;" vertex="1">
+            <mxGeometry as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Хранилища" mermaidId="n:Storage" mermaidBaseStyle="html=1;whiteSpace=nowrap;strokeWidth=1;verticalAlign=top;fillColor=#F0FDFA;strokeColor=#2DD4BF;fontColor=#000000;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Хранилища" id="jrwpsjGuzLij1hNiOoy2-2">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-1" style="html=1;whiteSpace=nowrap;strokeWidth=1;verticalAlign=top;fillColor=#F0FDFA;strokeColor=#2DD4BF;fontColor=#000000;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="180" width="1744" x="1574" y="1096" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="PostgreSQL catalog" mermaidId="n:CatPG" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="PostgreSQL catalog" id="jrwpsjGuzLij1hNiOoy2-3">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="108" width="144" x="994" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="PostgreSQL inventory" mermaidId="n:InvPG" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="PostgreSQL inventory" id="jrwpsjGuzLij1hNiOoy2-4">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="108" width="144" x="24" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="PostgreSQL order" mermaidId="n:OrdPG" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="PostgreSQL order" id="jrwpsjGuzLij1hNiOoy2-5">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="86" width="144" x="606" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="PostgreSQL payment" mermaidId="n:PayPG" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="PostgreSQL payment" id="jrwpsjGuzLij1hNiOoy2-6">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="108" width="144" x="1576" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="MongoDB review" mermaidId="n:RevM" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="MongoDB review" id="jrwpsjGuzLij1hNiOoy2-7">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="86" width="144" x="1382" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="MongoDB notification" mermaidId="n:NotM" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="MongoDB notification" id="jrwpsjGuzLij1hNiOoy2-8">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="108" width="144" x="412" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Redis catalog" mermaidId="n:CatR" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Redis catalog" id="jrwpsjGuzLij1hNiOoy2-9">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="86" width="144" x="800" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Redis inventory" mermaidId="n:InvR" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Redis inventory" id="jrwpsjGuzLij1hNiOoy2-10">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="86" width="144" x="218" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="MinIO covers" mermaidId="n:S3" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="MinIO covers" id="jrwpsjGuzLij1hNiOoy2-11">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="86" width="144" x="1188" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Бизнес-сервисы" mermaidId="n:Services" mermaidBaseStyle="html=1;whiteSpace=nowrap;strokeWidth=1;verticalAlign=top;fillColor=#FDF4FF;strokeColor=#E879F9;fontColor=#000000;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Бизнес-сервисы" id="jrwpsjGuzLij1hNiOoy2-12">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-1" style="html=1;whiteSpace=nowrap;strokeWidth=1;verticalAlign=top;fillColor=#FDF4FF;strokeColor=#E879F9;fontColor=#000000;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="361" width="1610" x="1868" y="415" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="catalog-service" mermaidId="n:Cat" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="catalog-service" id="jrwpsjGuzLij1hNiOoy2-13">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-12" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="45" width="152" x="999" y="283" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="inventory-service" mermaidId="n:Inv" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="inventory-service" id="jrwpsjGuzLij1hNiOoy2-14">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-12" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="67" width="152" x="70" y="270" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="order-service" mermaidId="n:Ord" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="order-service" id="jrwpsjGuzLij1hNiOoy2-15">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-12" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="45" width="152" x="577" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="payment-service" mermaidId="n:Pay" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="payment-service" id="jrwpsjGuzLij1hNiOoy2-16">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-12" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="45" width="152" x="1322" y="285" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="review-service" mermaidId="n:Rev" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="review-service" id="jrwpsjGuzLij1hNiOoy2-17">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-12" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="45" width="152" x="1410" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="notification-service" mermaidId="n:Not" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="notification-service" id="jrwpsjGuzLij1hNiOoy2-18">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-12" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="67" width="152" x="272" y="270" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: GET /internal/v1/books:batch" mermaidId="e:Ord-&gt;Cat#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.68;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: GET /internal/v1/books:batch" id="jrwpsjGuzLij1hNiOoy2-19">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-12" source="jrwpsjGuzLij1hNiOoy2-15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.68;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-13">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="681" y="135" />
+                <mxPoint x="864" y="135" />
+                <mxPoint x="864" y="228" />
+                <mxPoint x="1053" y="228" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: POST /internal/v1/reservations" mermaidId="e:Ord-&gt;Inv#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.44;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: POST /internal/v1/reservations" id="jrwpsjGuzLij1hNiOoy2-20">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-12" source="jrwpsjGuzLij1hNiOoy2-15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.44;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-14">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="644" y="147" />
+                <mxPoint x="581" y="147" />
+                <mxPoint x="581" y="228" />
+                <mxPoint x="168" y="228" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: POST /internal/v1/payments" mermaidId="e:Ord-&gt;Pay#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.81;exitY=1;entryX=0.35;entryY=0.01;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: POST /internal/v1/payments" id="jrwpsjGuzLij1hNiOoy2-21">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-12" source="jrwpsjGuzLij1hNiOoy2-15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.81;exitY=1;entryX=0.35;entryY=0.01;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-16">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="700" y="123" />
+                <mxPoint x="1132" y="123" />
+                <mxPoint x="1132" y="240" />
+                <mxPoint x="1376" y="240" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="Client" mermaidId="n:Client" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="👤 Client" id="jrwpsjGuzLij1hNiOoy2-22">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-1" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="45" width="152" x="2676" y="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="API Gateway (Nginx)" mermaidId="n:GW" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="API Gateway (Nginx)" id="jrwpsjGuzLij1hNiOoy2-23">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-1" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="67" width="152" x="2676" y="176" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Keycloak" mermaidId="n:KC" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Keycloak" id="jrwpsjGuzLij1hNiOoy2-24">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-1" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="45" width="152" x="1646" y="415" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="RabbitMQ" mermaidId="n:MQ" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="RabbitMQ" id="jrwpsjGuzLij1hNiOoy2-25">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-1" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="86" width="144" x="1172" y="1415" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Payment Gateway (external)" mermaidId="n:PG" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Payment Gateway (external)" id="jrwpsjGuzLij1hNiOoy2-26">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-1" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="87" width="152" x="3926" y="1415" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="MailHog (dev SMTP)" mermaidId="n:MH" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="MailHog (dev SMTP)" id="jrwpsjGuzLij1hNiOoy2-27">
+          <mxCell parent="jrwpsjGuzLij1hNiOoy2-1" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="67" width="152" x="497" y="1415" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="HTTPS: /api/v1/**" mermaidId="e:Client-&gt;GW#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="HTTPS: /api/v1/**" id="jrwpsjGuzLij1hNiOoy2-28">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-22" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-23">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points" />
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="HTTPS: verify JWT" mermaidId="e:GW-&gt;KC#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.19;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="HTTPS: verify JWT" id="jrwpsjGuzLij1hNiOoy2-29">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.19;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-24">
+            <mxGeometry relative="1" x="-0.0044" y="-13" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="2705" y="263" />
+                <mxPoint x="1722" y="263" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: /api/v1/books" mermaidId="e:GW-&gt;Cat#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.56;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: /api/v1/books" id="jrwpsjGuzLij1hNiOoy2-30">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.56;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-13">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2761" y="303" />
+                <mxPoint x="3058" y="303" />
+                <mxPoint x="3058" y="385" />
+                <mxPoint x="3133" y="385" />
+                <mxPoint x="3133" y="405" />
+                <mxPoint x="3133" y="643" />
+                <mxPoint x="2965" y="643" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: /api/v1/admin/books,&#xa;/api/v1/admin/stock" mermaidId="e:GW-&gt;Inv#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.31;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: /api/v1/admin/books,&#xa;/api/v1/admin/stock" id="jrwpsjGuzLij1hNiOoy2-31">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.31;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-14">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2724" y="283" />
+                <mxPoint x="1904" y="283" />
+                <mxPoint x="1904" y="405" />
+                <mxPoint x="1904" y="643" />
+                <mxPoint x="1992" y="643" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: /api/v1/orders" mermaidId="e:GW-&gt;Ord#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.44;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: /api/v1/orders" id="jrwpsjGuzLij1hNiOoy2-32">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.44;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-15">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2742" y="303" />
+                <mxPoint x="2521" y="303" />
+                <mxPoint x="2521" y="405" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: /api/v1/payments/{id}" mermaidId="e:GW-&gt;Pay#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.81;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: /api/v1/payments/{id}" id="jrwpsjGuzLij1hNiOoy2-33">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.81;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-16">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2799" y="263" />
+                <mxPoint x="3520" y="263" />
+                <mxPoint x="3520" y="385" />
+                <mxPoint x="3441" y="385" />
+                <mxPoint x="3441" y="405" />
+                <mxPoint x="3441" y="643" />
+                <mxPoint x="3287" y="643" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: /api/v1/books/{id}/reviews" mermaidId="e:GW-&gt;Rev#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.69;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: /api/v1/books/{id}/reviews" id="jrwpsjGuzLij1hNiOoy2-34">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.69;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-17">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2780" y="283" />
+                <mxPoint x="3275" y="283" />
+                <mxPoint x="3275" y="385" />
+                <mxPoint x="3353" y="385" />
+                <mxPoint x="3353" y="405" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="publish:&#xa;order.created, order.confirmed,&#xa;order.cancelled, order.expired" mermaidId="e:Ord-&gt;MQ#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.19;exitY=1;entryX=0.15;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="publish:&#xa;order.created, order.confirmed,&#xa;order.cancelled, order.expired" id="jrwpsjGuzLij1hNiOoy2-35">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.19;exitY=1;entryX=0.15;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-25">
+            <mxGeometry relative="1" x="-0.0024" y="-36" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="2474" y="538" />
+                <mxPoint x="1925" y="538" />
+                <mxPoint x="1925" y="786" />
+                <mxPoint x="1925" y="806" />
+                <mxPoint x="30" y="806" />
+                <mxPoint x="30" y="1395" />
+                <mxPoint x="1193" y="1395" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="publish:&#xa;payment.completed, payment.failed,&#xa;payment.refunded" mermaidId="e:Pay-&gt;MQ#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.35;exitY=1;entryX=0.62;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="publish:&#xa;payment.completed, payment.failed,&#xa;payment.refunded" id="jrwpsjGuzLij1hNiOoy2-36">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.35;exitY=1;entryX=0.62;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-25">
+            <mxGeometry relative="1" x="0.0049" y="-15" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="3244" y="786" />
+                <mxPoint x="3244" y="906" />
+                <mxPoint x="3484" y="906" />
+                <mxPoint x="3484" y="1315" />
+                <mxPoint x="1261" y="1315" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="publish:&#xa;stock.reserved, stock.released,&#xa;stock.reservation.expired" mermaidId="e:Inv-&gt;MQ#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.24;exitY=0.99;entryX=0.23;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="publish:&#xa;stock.reserved, stock.released,&#xa;stock.reservation.expired" id="jrwpsjGuzLij1hNiOoy2-37">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.24;exitY=0.99;entryX=0.23;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-25">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1975" y="786" />
+                <mxPoint x="1975" y="826" />
+                <mxPoint x="268" y="826" />
+                <mxPoint x="268" y="1355" />
+                <mxPoint x="1205" y="1355" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="publish: review.published" mermaidId="e:Rev-&gt;MQ#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=1;entryX=0.77;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="publish: review.published" id="jrwpsjGuzLij1hNiOoy2-38">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-17" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=1;entryX=0.77;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-25">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="3353" y="786" />
+                <mxPoint x="3353" y="826" />
+                <mxPoint x="4221" y="826" />
+                <mxPoint x="4221" y="1355" />
+                <mxPoint x="1284" y="1355" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="publish:&#xa;notification.sent, notification.failed" mermaidId="e:Not-&gt;MQ#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.41;exitY=0.99;entryX=0.38;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="publish:&#xa;notification.sent, notification.failed" id="jrwpsjGuzLij1hNiOoy2-39">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.41;exitY=0.99;entryX=0.38;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;">
+            <mxGeometry relative="1" x="0.0061" y="4" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="2207" y="786" />
+                <mxPoint x="2207" y="886" />
+                <mxPoint x="870" y="886" />
+                <mxPoint x="870" y="1315" />
+                <mxPoint x="1231" y="1315" />
+              </Array>
+              <mxPoint x="2206.0408163265306" y="752" as="sourcePoint" />
+              <mxPoint x="1230.72" y="1415" as="targetPoint" />
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="subscribe:&#xa;payment.completed, payment.failed" mermaidId="e:MQ-&gt;Ord#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.54;exitY=0;entryX=0.32;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="subscribe:&#xa;payment.completed, payment.failed" id="jrwpsjGuzLij1hNiOoy2-40">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.54;exitY=0;entryX=0.32;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-15">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1250" y="1295" />
+                <mxPoint x="1409" y="1295" />
+                <mxPoint x="1409" y="966" />
+                <mxPoint x="2304" y="966" />
+                <mxPoint x="2304" y="786" />
+                <mxPoint x="2304" y="550" />
+                <mxPoint x="2493" y="550" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="subscribe: order.expired" mermaidId="e:MQ-&gt;Pay#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.7;exitY=0;entryX=0.5;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="subscribe: order.expired" id="jrwpsjGuzLij1hNiOoy2-41">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.7;exitY=0;entryX=0.5;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-16">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1272" y="1335" />
+                <mxPoint x="3715" y="1335" />
+                <mxPoint x="3715" y="886" />
+                <mxPoint x="3265" y="886" />
+                <mxPoint x="3265" y="786" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="subscribe:&#xa;order.confirmed, order.cancelled" mermaidId="e:MQ-&gt;Inv#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.31;exitY=0;entryX=0.41;entryY=0.99;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="subscribe:&#xa;order.confirmed, order.cancelled" id="jrwpsjGuzLij1hNiOoy2-42">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.31;exitY=0;entryX=0.41;entryY=0.99;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-14">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1216" y="1335" />
+                <mxPoint x="510" y="1335" />
+                <mxPoint x="510" y="846" />
+                <mxPoint x="2001" y="846" />
+                <mxPoint x="2001" y="786" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="subscribe: order.confirmed" mermaidId="e:MQ-&gt;Rev#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.85;exitY=0;entryX=0.71;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="subscribe: order.confirmed" id="jrwpsjGuzLij1hNiOoy2-43">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.85;exitY=0;entryX=0.71;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-17">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1295" y="1375" />
+                <mxPoint x="4423" y="1375" />
+                <mxPoint x="4423" y="806" />
+                <mxPoint x="3386" y="806" />
+                <mxPoint x="3386" y="786" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="subscribe:&#xa;order.confirmed, order.cancelled,&#xa;payment.completed, payment.failed,&#xa;review.published" mermaidId="e:MQ-&gt;Not#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.46;exitY=0;entryX=0.58;entryY=0.99;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="subscribe:&#xa;order.confirmed, order.cancelled,&#xa;payment.completed, payment.failed,&#xa;review.published" id="jrwpsjGuzLij1hNiOoy2-44">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.46;exitY=0;entryX=0.58;entryY=0.99;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-18">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1238" y="1295" />
+                <mxPoint x="1138" y="1295" />
+                <mxPoint x="1138" y="926" />
+                <mxPoint x="2229" y="926" />
+                <mxPoint x="2229" y="786" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="HTTPS: POST /payments" mermaidId="e:Pay-&gt;PG#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.64;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="HTTPS: POST /payments" id="jrwpsjGuzLij1hNiOoy2-45">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.64;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-26">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="3287" y="786" />
+                <mxPoint x="3287" y="866" />
+                <mxPoint x="3902" y="866" />
+                <mxPoint x="3902" y="1395" />
+                <mxPoint x="3980" y="1395" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="HTTPS webhook" mermaidId="e:PG-&gt;Pay#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.64;exitY=0;entryX=0.78;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="HTTPS webhook" id="jrwpsjGuzLij1hNiOoy2-46">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-26" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.64;exitY=0;entryX=0.78;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="jrwpsjGuzLij1hNiOoy2-16">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="4024" y="1395" />
+                <mxPoint x="4058" y="1395" />
+                <mxPoint x="4058" y="846" />
+                <mxPoint x="3309" y="846" />
+                <mxPoint x="3309" y="786" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="SMTP: send" mermaidId="e:Not-&gt;MH#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.24;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="SMTP: send" id="jrwpsjGuzLij1hNiOoy2-47">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.24;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2177" y="784" />
+                <mxPoint x="2177" y="864" />
+                <mxPoint x="681" y="864" />
+                <mxPoint x="681" y="1373" />
+                <mxPoint x="573" y="1373" />
+              </Array>
+              <mxPoint x="2175.6734693877547" y="750" as="sourcePoint" />
+              <mxPoint x="573" y="1413" as="targetPoint" />
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Cat-&gt;CatPG#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="jrwpsjGuzLij1hNiOoy2-48">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="jrwpsjGuzLij1hNiOoy2-3">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2943" y="786" />
+                <mxPoint x="2943" y="1046" />
+                <mxPoint x="2640" y="1046" />
+                <mxPoint x="2640" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Cat-&gt;CatR#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.29;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="jrwpsjGuzLij1hNiOoy2-49">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.29;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="jrwpsjGuzLij1hNiOoy2-9">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2910" y="786" />
+                <mxPoint x="2910" y="1026" />
+                <mxPoint x="2446" y="1026" />
+                <mxPoint x="2446" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Cat-&gt;S3#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.71;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="jrwpsjGuzLij1hNiOoy2-50">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.71;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="jrwpsjGuzLij1hNiOoy2-11">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2976" y="786" />
+                <mxPoint x="2976" y="1066" />
+                <mxPoint x="2834" y="1066" />
+                <mxPoint x="2834" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Inv-&gt;InvPG#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.58;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="jrwpsjGuzLij1hNiOoy2-51">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.58;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="jrwpsjGuzLij1hNiOoy2-4">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2027" y="786" />
+                <mxPoint x="2027" y="906" />
+                <mxPoint x="1670" y="906" />
+                <mxPoint x="1670" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Inv-&gt;InvR#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.76;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="jrwpsjGuzLij1hNiOoy2-52">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.76;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="jrwpsjGuzLij1hNiOoy2-10">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2053" y="786" />
+                <mxPoint x="2053" y="946" />
+                <mxPoint x="1864" y="946" />
+                <mxPoint x="1864" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Ord-&gt;OrdPG#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.56;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="jrwpsjGuzLij1hNiOoy2-53">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.56;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="jrwpsjGuzLij1hNiOoy2-5">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2530" y="562" />
+                <mxPoint x="2593" y="562" />
+                <mxPoint x="2593" y="786" />
+                <mxPoint x="2593" y="1006" />
+                <mxPoint x="2252" y="1006" />
+                <mxPoint x="2252" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Pay-&gt;PayPG#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.21;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="jrwpsjGuzLij1hNiOoy2-54">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.21;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="jrwpsjGuzLij1hNiOoy2-6">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points" />
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Rev-&gt;RevM#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.28;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="jrwpsjGuzLij1hNiOoy2-55">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-17" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.28;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="jrwpsjGuzLij1hNiOoy2-7">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="3321" y="538" />
+                <mxPoint x="3176" y="538" />
+                <mxPoint x="3176" y="786" />
+                <mxPoint x="3176" y="806" />
+                <mxPoint x="3028" y="806" />
+                <mxPoint x="3028" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Not-&gt;NotM#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.76;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="jrwpsjGuzLij1hNiOoy2-56">
+          <mxCell edge="1" parent="jrwpsjGuzLij1hNiOoy2-1" source="jrwpsjGuzLij1hNiOoy2-18" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.76;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="jrwpsjGuzLij1hNiOoy2-8">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2255" y="786" />
+                <mxPoint x="2255" y="986" />
+                <mxPoint x="2058" y="986" />
+                <mxPoint x="2058" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="qFJMmLqZlu_1-Fo8TuRO" name="Страница-2">
+    <mxGraphModel dx="2174" dy="813" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <UserObject label="" mermaidData="{&#xa;  &quot;data&quot;: &quot;flowchart TB\n    Client[\&quot;👤 Client\&quot;]\n    GW[\&quot;API Gateway (Nginx)\&quot;]\n    KC[\&quot;Keycloak\&quot;]\n\n    subgraph Services[\&quot;Бизнес-сервисы\&quot;]\n        Cat[\&quot;catalog-service\&quot;]\n        Inv[\&quot;inventory-service\&quot;]\n        Ord[\&quot;order-service\&quot;]\n        Pay[\&quot;payment-service\&quot;]\n        Rev[\&quot;review-service\&quot;]\n        Not[\&quot;notification-service\&quot;]\n    end\n\n    subgraph Storage[\&quot;Хранилища\&quot;]\n        CatPG[(\&quot;PostgreSQL catalog\&quot;)]\n        InvPG[(\&quot;PostgreSQL inventory\&quot;)]\n        OrdPG[(\&quot;PostgreSQL order\&quot;)]\n        PayPG[(\&quot;PostgreSQL payment\&quot;)]\n        RevM[(\&quot;MongoDB review\&quot;)]\n        NotM[(\&quot;MongoDB notification\&quot;)]\n        CatR[(\&quot;Redis catalog\&quot;)]\n        InvR[(\&quot;Redis inventory\&quot;)]\n        S3[(\&quot;MinIO covers\&quot;)]\n    end\n\n    MQ[(\&quot;RabbitMQ\&quot;)]\n    PG[\&quot;Payment Gateway (external)\&quot;]\n    MH[\&quot;MailHog (dev SMTP)\&quot;]\n\n    %% Client → Gateway\n    Client --&gt;|\&quot;HTTPS: /api/v1/**\&quot;| GW\n    GW -.-&gt;|\&quot;HTTPS: verify JWT\&quot;| KC\n\n    %% Gateway → public endpoints\n    GW --&gt;|\&quot;REST: /api/v1/books\&quot;| Cat\n    GW --&gt;|\&quot;REST: /api/v1/admin/books,&lt;br/&gt;/api/v1/admin/stock\&quot;| Inv\n    GW --&gt;|\&quot;REST: /api/v1/orders\&quot;| Ord\n    GW --&gt;|\&quot;REST: /api/v1/payments/{id}\&quot;| Pay\n    GW --&gt;|\&quot;REST: /api/v1/books/{id}/reviews\&quot;| Rev\n\n    %% Service-to-service (sync, internal)\n    Ord --&gt;|\&quot;REST: GET /internal/v1/books:batch\&quot;| Cat\n    Ord --&gt;|\&quot;REST: POST /internal/v1/reservations\&quot;| Inv\n    Ord --&gt;|\&quot;REST: POST /internal/v1/payments\&quot;| Pay\n\n    %% Async: publishers\n    Ord -.-&gt;|\&quot;publish:&lt;br/&gt;order.created, order.confirmed,&lt;br/&gt;order.cancelled, order.expired\&quot;| MQ\n    Pay -.-&gt;|\&quot;publish:&lt;br/&gt;payment.completed, payment.failed,&lt;br/&gt;payment.refunded\&quot;| MQ\n    Inv -.-&gt;|\&quot;publish:&lt;br/&gt;stock.reserved, stock.released,&lt;br/&gt;stock.reservation.expired\&quot;| MQ\n    Rev -.-&gt;|\&quot;publish: review.published\&quot;| MQ\n    Not -.-&gt;|\&quot;publish:&lt;br/&gt;notification.sent, notification.failed\&quot;| MQ\n\n    %% Async: subscribers\n    MQ -.-&gt;|\&quot;subscribe:&lt;br/&gt;payment.completed, payment.failed\&quot;| Ord\n    MQ -.-&gt;|\&quot;subscribe: order.expired\&quot;| Pay\n    MQ -.-&gt;|\&quot;subscribe:&lt;br/&gt;order.confirmed, order.cancelled\&quot;| Inv\n    MQ -.-&gt;|\&quot;subscribe: order.confirmed\&quot;| Rev\n    MQ -.-&gt;|\&quot;subscribe:&lt;br/&gt;order.confirmed, order.cancelled,&lt;br/&gt;payment.completed, payment.failed,&lt;br/&gt;review.published\&quot;| Not\n\n    %% External\n    Pay --&gt;|\&quot;HTTPS: POST /payments\&quot;| PG\n    PG -.-&gt;|\&quot;HTTPS webhook\&quot;| Pay\n    Not --&gt;|\&quot;SMTP: send\&quot;| MH\n\n    %% Storage\n    Cat --&gt; CatPG\n    Cat --&gt; CatR\n    Cat --&gt; S3\n    Inv --&gt; InvPG\n    Inv --&gt; InvR\n    Ord --&gt; OrdPG\n    Pay --&gt; PayPG\n    Rev --&gt; RevM\n    Not --&gt; NotM\n\n    classDef svc fill:#dae8fc,stroke:#6c8ebf,color:#000\n    classDef db fill:#d5e8d4,stroke:#82b366,color:#000\n    classDef infra fill:#fff2cc,stroke:#d6b656,color:#000\n    classDef ext fill:#f8cecc,stroke:#b85450,color:#000\n\n    class Cat,Inv,Ord,Pay,Rev,Not svc\n    class CatPG,InvPG,OrdPG,PayPG,RevM,NotM,CatR,InvR,S3 db\n    class GW,KC,MQ infra\n    class PG,MH,Client ext&quot;,&#xa;  &quot;config&quot;: null,&#xa;  &quot;version&quot;: &quot;12&quot;&#xa;}" id="pAARZLXjjHLFE3CaUKM3-1">
+          <mxCell connectable="0" parent="1" style="group;transparentBounds=1;editIcon=1;lockedGroup=0;groupPadding=10;" vertex="1">
+            <mxGeometry as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Хранилища" mermaidId="n:Storage" mermaidBaseStyle="html=1;whiteSpace=nowrap;strokeWidth=1;verticalAlign=top;fillColor=#F0FDFA;strokeColor=#2DD4BF;fontColor=#000000;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Хранилища" id="pAARZLXjjHLFE3CaUKM3-2">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-1" style="html=1;whiteSpace=nowrap;strokeWidth=1;verticalAlign=top;fillColor=#F0FDFA;strokeColor=#2DD4BF;fontColor=#000000;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="180" width="1744" x="1574" y="1096" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="PostgreSQL catalog" mermaidId="n:CatPG" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="PostgreSQL catalog" id="pAARZLXjjHLFE3CaUKM3-3">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="108" width="144" x="994" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="PostgreSQL inventory" mermaidId="n:InvPG" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="PostgreSQL inventory" id="pAARZLXjjHLFE3CaUKM3-4">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="108" width="144" x="24" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="PostgreSQL order" mermaidId="n:OrdPG" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="PostgreSQL order" id="pAARZLXjjHLFE3CaUKM3-5">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="86" width="144" x="606" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="PostgreSQL payment" mermaidId="n:PayPG" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="PostgreSQL payment" id="pAARZLXjjHLFE3CaUKM3-6">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="108" width="144" x="1576" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="MongoDB review" mermaidId="n:RevM" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="MongoDB review" id="pAARZLXjjHLFE3CaUKM3-7">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="86" width="144" x="1382" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="MongoDB notification" mermaidId="n:NotM" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="MongoDB notification" id="pAARZLXjjHLFE3CaUKM3-8">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="108" width="144" x="412" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Redis catalog" mermaidId="n:CatR" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Redis catalog" id="pAARZLXjjHLFE3CaUKM3-9">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="86" width="144" x="800" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Redis inventory" mermaidId="n:InvR" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Redis inventory" id="pAARZLXjjHLFE3CaUKM3-10">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="86" width="144" x="218" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="MinIO covers" mermaidId="n:S3" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="MinIO covers" id="pAARZLXjjHLFE3CaUKM3-11">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-2" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="86" width="144" x="1188" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Бизнес-сервисы" mermaidId="n:Services" mermaidBaseStyle="html=1;whiteSpace=nowrap;strokeWidth=1;verticalAlign=top;fillColor=#FDF4FF;strokeColor=#E879F9;fontColor=#000000;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Бизнес-сервисы" id="pAARZLXjjHLFE3CaUKM3-12">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-1" style="html=1;whiteSpace=nowrap;strokeWidth=1;verticalAlign=top;fillColor=#FDF4FF;strokeColor=#E879F9;fontColor=#000000;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="361" width="1610" x="1868" y="415" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="catalog-service" mermaidId="n:Cat" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="catalog-service" id="pAARZLXjjHLFE3CaUKM3-13">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-12" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="45" width="152" x="999" y="283" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="inventory-service" mermaidId="n:Inv" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="inventory-service" id="pAARZLXjjHLFE3CaUKM3-14">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-12" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="67" width="152" x="70" y="270" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="order-service" mermaidId="n:Ord" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="order-service" id="pAARZLXjjHLFE3CaUKM3-15">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-12" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="45" width="152" x="577" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="payment-service" mermaidId="n:Pay" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="payment-service" id="pAARZLXjjHLFE3CaUKM3-16">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-12" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="45" width="152" x="1322" y="285" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="review-service" mermaidId="n:Rev" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="review-service" id="pAARZLXjjHLFE3CaUKM3-17">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-12" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="45" width="152" x="1410" y="48" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="notification-service" mermaidId="n:Not" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="notification-service" id="pAARZLXjjHLFE3CaUKM3-18">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-12" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#dae8fc;strokeColor=#6c8ebf;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="67" width="152" x="272" y="270" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: GET /internal/v1/books:batch" mermaidId="e:Ord-&gt;Cat#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.68;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: GET /internal/v1/books:batch" id="pAARZLXjjHLFE3CaUKM3-19">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-12" source="pAARZLXjjHLFE3CaUKM3-15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.68;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-13">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="681" y="135" />
+                <mxPoint x="864" y="135" />
+                <mxPoint x="864" y="228" />
+                <mxPoint x="1053" y="228" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: POST /internal/v1/reservations" mermaidId="e:Ord-&gt;Inv#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.44;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: POST /internal/v1/reservations" id="pAARZLXjjHLFE3CaUKM3-20">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-12" source="pAARZLXjjHLFE3CaUKM3-15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.44;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-14">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="644" y="147" />
+                <mxPoint x="581" y="147" />
+                <mxPoint x="581" y="228" />
+                <mxPoint x="168" y="228" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: POST /internal/v1/payments" mermaidId="e:Ord-&gt;Pay#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.81;exitY=1;entryX=0.35;entryY=0.01;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: POST /internal/v1/payments" id="pAARZLXjjHLFE3CaUKM3-21">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-12" source="pAARZLXjjHLFE3CaUKM3-15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.81;exitY=1;entryX=0.35;entryY=0.01;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-16">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="700" y="123" />
+                <mxPoint x="1132" y="123" />
+                <mxPoint x="1132" y="240" />
+                <mxPoint x="1376" y="240" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="Client" mermaidId="n:Client" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="👤 Client" id="pAARZLXjjHLFE3CaUKM3-22">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-1" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="45" width="152" x="2676" y="30" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="API Gateway (Nginx)" mermaidId="n:GW" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="API Gateway (Nginx)" id="pAARZLXjjHLFE3CaUKM3-23">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-1" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="67" width="152" x="2676" y="176" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Keycloak" mermaidId="n:KC" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Keycloak" id="pAARZLXjjHLFE3CaUKM3-24">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-1" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="45" width="152" x="1646" y="415" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="RabbitMQ" mermaidId="n:MQ" mermaidBaseStyle="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="RabbitMQ" id="pAARZLXjjHLFE3CaUKM3-25">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-1" style="html=1;shape=cylinder3;boundedLbl=1;backgroundOutline=1;size=10;strokeWidth=2;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="86" width="144" x="1172" y="1415" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="Payment Gateway (external)" mermaidId="n:PG" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="Payment Gateway (external)" id="pAARZLXjjHLFE3CaUKM3-26">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-1" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="87" width="152" x="3926" y="1415" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="MailHog (dev SMTP)" mermaidId="n:MH" mermaidBaseStyle="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;" mermaidBaseValue="MailHog (dev SMTP)" id="pAARZLXjjHLFE3CaUKM3-27">
+          <mxCell parent="pAARZLXjjHLFE3CaUKM3-1" style="html=1;whiteSpace=wrap;strokeWidth=2;fillColor=#f8cecc;strokeColor=#b85450;fontColor=default;fontFamily=Recursive;fontSize=14;shadow=1;shadowColor=#000000;shadowOffsetX=4;shadowOffsetY=4;shadowBlur=0;shadowOpacity=6;labelWidth=120;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" vertex="1">
+            <mxGeometry height="67" width="152" x="497" y="1415" as="geometry" />
+          </mxCell>
+        </UserObject>
+        <UserObject label="HTTPS: /api/v1/**" mermaidId="e:Client-&gt;GW#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="HTTPS: /api/v1/**" id="pAARZLXjjHLFE3CaUKM3-28">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-22" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-23">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points" />
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="HTTPS: verify JWT" mermaidId="e:GW-&gt;KC#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.19;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="HTTPS: verify JWT" id="pAARZLXjjHLFE3CaUKM3-29">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.19;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-24">
+            <mxGeometry relative="1" x="-0.0008" as="geometry">
+              <Array as="points">
+                <mxPoint x="2704.9" y="250" />
+                <mxPoint x="1722" y="250" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: /api/v1/books" mermaidId="e:GW-&gt;Cat#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.56;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: /api/v1/books" id="pAARZLXjjHLFE3CaUKM3-30">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.56;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-13">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2761" y="303" />
+                <mxPoint x="3058" y="303" />
+                <mxPoint x="3058" y="385" />
+                <mxPoint x="3133" y="385" />
+                <mxPoint x="3133" y="405" />
+                <mxPoint x="3133" y="643" />
+                <mxPoint x="2965" y="643" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: /api/v1/admin/books,&#xa;/api/v1/admin/stock" mermaidId="e:GW-&gt;Inv#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.31;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: /api/v1/admin/books,&#xa;/api/v1/admin/stock" id="pAARZLXjjHLFE3CaUKM3-31">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.31;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-14">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2724" y="283" />
+                <mxPoint x="1904" y="283" />
+                <mxPoint x="1904" y="405" />
+                <mxPoint x="1904" y="643" />
+                <mxPoint x="1992" y="643" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: /api/v1/orders" mermaidId="e:GW-&gt;Ord#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.44;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: /api/v1/orders" id="pAARZLXjjHLFE3CaUKM3-32">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.44;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-15">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2742" y="303" />
+                <mxPoint x="2521" y="303" />
+                <mxPoint x="2521" y="405" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: /api/v1/payments/{id}" mermaidId="e:GW-&gt;Pay#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.81;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: /api/v1/payments/{id}" id="pAARZLXjjHLFE3CaUKM3-33">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.81;exitY=1;entryX=0.64;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-16">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2799" y="263" />
+                <mxPoint x="3520" y="263" />
+                <mxPoint x="3520" y="385" />
+                <mxPoint x="3441" y="385" />
+                <mxPoint x="3441" y="405" />
+                <mxPoint x="3441" y="643" />
+                <mxPoint x="3287" y="643" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="REST: /api/v1/books/{id}/reviews" mermaidId="e:GW-&gt;Rev#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.69;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="REST: /api/v1/books/{id}/reviews" id="pAARZLXjjHLFE3CaUKM3-34">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-23" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.69;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-17">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2780" y="283" />
+                <mxPoint x="3275" y="283" />
+                <mxPoint x="3275" y="385" />
+                <mxPoint x="3353" y="385" />
+                <mxPoint x="3353" y="405" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="publish:&#xa;order.created, order.confirmed,&#xa;order.cancelled, order.expired" mermaidId="e:Ord-&gt;MQ#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.19;exitY=1;entryX=0.15;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="publish:&#xa;order.created, order.confirmed,&#xa;order.cancelled, order.expired" id="pAARZLXjjHLFE3CaUKM3-35">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.19;exitY=1;entryX=0.15;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-25">
+            <mxGeometry relative="1" x="-0.1707" y="-26" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="2474" y="538" />
+                <mxPoint x="1925" y="538" />
+                <mxPoint x="1925" y="786" />
+                <mxPoint x="1925" y="806" />
+                <mxPoint x="30" y="806" />
+                <mxPoint x="30" y="1395" />
+                <mxPoint x="1193" y="1395" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="publish:&#xa;payment.completed, payment.failed,&#xa;payment.refunded" mermaidId="e:Pay-&gt;MQ#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.35;exitY=1;entryX=0.62;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="publish:&#xa;payment.completed, payment.failed,&#xa;payment.refunded" id="pAARZLXjjHLFE3CaUKM3-36">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.35;exitY=1;entryX=0.62;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-25">
+            <mxGeometry relative="1" x="-0.0015" y="-5" as="geometry">
+              <mxPoint as="offset" />
+              <Array as="points">
+                <mxPoint x="3244" y="786" />
+                <mxPoint x="3244" y="906" />
+                <mxPoint x="3484" y="906" />
+                <mxPoint x="3484" y="1315" />
+                <mxPoint x="1261" y="1315" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="publish:&#xa;stock.reserved, stock.released,&#xa;stock.reservation.expired" mermaidId="e:Inv-&gt;MQ#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.24;exitY=0.99;entryX=0.23;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="publish:&#xa;stock.reserved, stock.released,&#xa;stock.reservation.expired" id="pAARZLXjjHLFE3CaUKM3-37">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.24;exitY=0.99;entryX=0.23;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-25">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1975" y="786" />
+                <mxPoint x="1975" y="826" />
+                <mxPoint x="268" y="826" />
+                <mxPoint x="268" y="1355" />
+                <mxPoint x="1205" y="1355" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="publish: review.published" mermaidId="e:Rev-&gt;MQ#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=1;entryX=0.77;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="publish: review.published" id="pAARZLXjjHLFE3CaUKM3-38">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-17" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.5;exitY=1;entryX=0.77;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-25">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="3353" y="786" />
+                <mxPoint x="3353" y="826" />
+                <mxPoint x="4221" y="826" />
+                <mxPoint x="4221" y="1355" />
+                <mxPoint x="1284" y="1355" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="publish:&#xa;notification.sent, notification.failed" mermaidId="e:Not-&gt;MQ#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.41;exitY=0.99;entryX=0.38;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="publish:&#xa;notification.sent, notification.failed" id="pAARZLXjjHLFE3CaUKM3-39">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-18" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.41;exitY=0.99;entryX=0.38;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-25">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2203" y="786" />
+                <mxPoint x="2203" y="886" />
+                <mxPoint x="866" y="886" />
+                <mxPoint x="866" y="1315" />
+                <mxPoint x="1227" y="1315" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="subscribe:&#xa;payment.completed, payment.failed" mermaidId="e:MQ-&gt;Ord#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.54;exitY=0;entryX=0.32;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="subscribe:&#xa;payment.completed, payment.failed" id="pAARZLXjjHLFE3CaUKM3-40">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.54;exitY=0;entryX=0.32;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-15">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1250" y="1295" />
+                <mxPoint x="1409" y="1295" />
+                <mxPoint x="1409" y="966" />
+                <mxPoint x="2304" y="966" />
+                <mxPoint x="2304" y="786" />
+                <mxPoint x="2304" y="550" />
+                <mxPoint x="2493" y="550" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="subscribe: order.expired" mermaidId="e:MQ-&gt;Pay#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.7;exitY=0;entryX=0.5;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="subscribe: order.expired" id="pAARZLXjjHLFE3CaUKM3-41">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.7;exitY=0;entryX=0.5;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-16">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1272" y="1335" />
+                <mxPoint x="3715" y="1335" />
+                <mxPoint x="3715" y="886" />
+                <mxPoint x="3265" y="886" />
+                <mxPoint x="3265" y="786" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="subscribe:&#xa;order.confirmed, order.cancelled" mermaidId="e:MQ-&gt;Inv#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.31;exitY=0;entryX=0.41;entryY=0.99;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="subscribe:&#xa;order.confirmed, order.cancelled" id="pAARZLXjjHLFE3CaUKM3-42">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.31;exitY=0;entryX=0.41;entryY=0.99;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-14">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1216" y="1335" />
+                <mxPoint x="510" y="1335" />
+                <mxPoint x="510" y="846" />
+                <mxPoint x="2001" y="846" />
+                <mxPoint x="2001" y="786" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="subscribe: order.confirmed" mermaidId="e:MQ-&gt;Rev#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.85;exitY=0;entryX=0.71;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="subscribe: order.confirmed" id="pAARZLXjjHLFE3CaUKM3-43">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.85;exitY=0;entryX=0.71;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-17">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1295" y="1375" />
+                <mxPoint x="4423" y="1375" />
+                <mxPoint x="4423" y="806" />
+                <mxPoint x="3386" y="806" />
+                <mxPoint x="3386" y="786" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="subscribe:&#xa;order.confirmed, order.cancelled,&#xa;payment.completed, payment.failed,&#xa;review.published" mermaidId="e:MQ-&gt;Not#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.46;exitY=0;entryX=0.58;entryY=0.99;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="subscribe:&#xa;order.confirmed, order.cancelled,&#xa;payment.completed, payment.failed,&#xa;review.published" id="pAARZLXjjHLFE3CaUKM3-44">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-25" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.46;exitY=0;entryX=0.58;entryY=0.99;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-18">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="1238" y="1295" />
+                <mxPoint x="1138" y="1295" />
+                <mxPoint x="1138" y="926" />
+                <mxPoint x="2229" y="926" />
+                <mxPoint x="2229" y="786" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="HTTPS: POST /payments" mermaidId="e:Pay-&gt;PG#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.64;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="HTTPS: POST /payments" id="pAARZLXjjHLFE3CaUKM3-45">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.64;exitY=1;entryX=0.36;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-26">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="3287" y="786" />
+                <mxPoint x="3287" y="866" />
+                <mxPoint x="3902" y="866" />
+                <mxPoint x="3902" y="1395" />
+                <mxPoint x="3980" y="1395" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="HTTPS webhook" mermaidId="e:PG-&gt;Pay#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.64;exitY=0;entryX=0.78;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="HTTPS webhook" id="pAARZLXjjHLFE3CaUKM3-46">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-26" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;dashed=1;dashPattern=2 2;fixDash=1;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.64;exitY=0;entryX=0.78;entryY=1;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-16">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="4024" y="1395" />
+                <mxPoint x="4058" y="1395" />
+                <mxPoint x="4058" y="846" />
+                <mxPoint x="3309" y="846" />
+                <mxPoint x="3309" y="786" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="SMTP: send" mermaidId="e:Not-&gt;MH#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=16;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.24;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="SMTP: send" id="pAARZLXjjHLFE3CaUKM3-47">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-18" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;html=1;fontSize=14;labelBackgroundColor=#cccccc;fontFamily=Recursive;fontColor=#28253D;exitX=0.24;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;fontSource=https%3A%2F%2Ffonts.googleapis.com%2Fcss%3Ffamily%3DRecursive;" target="pAARZLXjjHLFE3CaUKM3-27">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2177" y="786" />
+                <mxPoint x="2177" y="866" />
+                <mxPoint x="681" y="866" />
+                <mxPoint x="681" y="1375" />
+                <mxPoint x="573" y="1375" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Cat-&gt;CatPG#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="pAARZLXjjHLFE3CaUKM3-48">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="pAARZLXjjHLFE3CaUKM3-3">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2943" y="786" />
+                <mxPoint x="2943" y="1046" />
+                <mxPoint x="2640" y="1046" />
+                <mxPoint x="2640" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Cat-&gt;CatR#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.29;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="pAARZLXjjHLFE3CaUKM3-49">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.29;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="pAARZLXjjHLFE3CaUKM3-9">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2910" y="786" />
+                <mxPoint x="2910" y="1026" />
+                <mxPoint x="2446" y="1026" />
+                <mxPoint x="2446" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Cat-&gt;S3#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.71;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="pAARZLXjjHLFE3CaUKM3-50">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-13" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.71;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="pAARZLXjjHLFE3CaUKM3-11">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2976" y="786" />
+                <mxPoint x="2976" y="1066" />
+                <mxPoint x="2834" y="1066" />
+                <mxPoint x="2834" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Inv-&gt;InvPG#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.58;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="pAARZLXjjHLFE3CaUKM3-51">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.58;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="pAARZLXjjHLFE3CaUKM3-4">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2027" y="786" />
+                <mxPoint x="2027" y="906" />
+                <mxPoint x="1670" y="906" />
+                <mxPoint x="1670" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Inv-&gt;InvR#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.76;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="pAARZLXjjHLFE3CaUKM3-52">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-14" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.76;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="pAARZLXjjHLFE3CaUKM3-10">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2053" y="786" />
+                <mxPoint x="2053" y="946" />
+                <mxPoint x="1864" y="946" />
+                <mxPoint x="1864" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Ord-&gt;OrdPG#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.56;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="pAARZLXjjHLFE3CaUKM3-53">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-15" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.56;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="pAARZLXjjHLFE3CaUKM3-5">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2530" y="562" />
+                <mxPoint x="2593" y="562" />
+                <mxPoint x="2593" y="786" />
+                <mxPoint x="2593" y="1006" />
+                <mxPoint x="2252" y="1006" />
+                <mxPoint x="2252" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Pay-&gt;PayPG#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.21;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="pAARZLXjjHLFE3CaUKM3-54">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-16" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.21;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="pAARZLXjjHLFE3CaUKM3-6">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points" />
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Rev-&gt;RevM#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.28;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="pAARZLXjjHLFE3CaUKM3-55">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-17" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.28;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="pAARZLXjjHLFE3CaUKM3-7">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="3321" y="538" />
+                <mxPoint x="3176" y="538" />
+                <mxPoint x="3176" y="786" />
+                <mxPoint x="3176" y="806" />
+                <mxPoint x="3028" y="806" />
+                <mxPoint x="3028" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+        <UserObject label="" mermaidId="e:Not-&gt;NotM#0" mermaidBaseStyle="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.76;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" mermaidBaseValue="" id="pAARZLXjjHLFE3CaUKM3-56">
+          <mxCell edge="1" parent="pAARZLXjjHLFE3CaUKM3-1" source="pAARZLXjjHLFE3CaUKM3-18" style="edgeStyle=orthogonalEdgeStyle;rounded=1;curved=0;startArrow=none;endArrow=block;endSize=8;jumpStyle=arc;jumpSize=12;strokeColor=#000000;exitX=0.76;exitY=0.99;entryX=0.5;entryY=0;strokeWidth=2;targetPerimeterSpacing=4;" target="pAARZLXjjHLFE3CaUKM3-8">
+            <mxGeometry relative="1" as="geometry">
+              <Array as="points">
+                <mxPoint x="2255" y="786" />
+                <mxPoint x="2255" y="986" />
+                <mxPoint x="2058" y="986" />
+                <mxPoint x="2058" y="1086" />
+              </Array>
+            </mxGeometry>
+          </mxCell>
+        </UserObject>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
+

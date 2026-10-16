@@ -5,7 +5,7 @@
 1. [Анализ предметной области](#1-анализ-предметной-области)
 2. [Карточки сервисов](#2-карточки-сервисов)
 3. [Выбор ПО](#3-выбор-по)
-4. [Схемы взаимодействий](#4-схемы-взаимодействий) *(Шаг 4)*
+4. [Схемы взаимодействий](#4-схемы-взаимодействий)
 5. [Контракты API](#5-контракты-api) *(Шаг 5)*
 
 ---
@@ -303,7 +303,7 @@
 | **PostgreSQL** (отдельный инстанс на сервис) | catalog, inventory, order, payment | Все четыре сервиса оперируют сущностями со **строгой схемой** и **связями**. Требуются **транзакции ACID**: атомарное списание остатка, атомарная смена статуса заказа, аудит платежей. SQL-схема нужна для отчётности и аналитики. |
 | **MongoDB** (отдельный инстанс на сервис) | review, notification | **review**: отзывы имеют разную структуру в зависимости от типа (книга / автор / пользователь), а читаются всегда целиком документом – гибкая схема выгоднее фиксированной. **notification**: журнал отправок хранит разные шаблоны писем, строгая схема только мешает. В обоих случаях нет потребности в связях и транзакциях между документами. |
 | **Redis** (отдельный инстанс на сервис) | catalog (кэш), inventory (TTL-резервы) | **catalog**: соотношение чтения к записи 100:1 – кэш горячих книг ускоряет отдачу до < 10 мс. **inventory**: резерв – это ключ с TTL 15 минут; Redis даёт встроенный автоэкспайр и атомарные операции, что идеально подходит для блокировки остатка. |
-| **RabbitMQ** | все 6 сервисов | Нужны **событийный и командно-очередной** обмен: `order.confirmed` (событие, несколько подписчиков – review, notification), `payment.completed` (событие, оркестратор – order), задачи с retry и DLQ (уведомления). RabbitMQ даёт маршрутизацию через exchanges, гарантию доставки, dead-letter queue «из коробки».|
+| **RabbitMQ** | Keycloak, inventory, order, catalog, review, payment | Нужны **событийный и командно-очередной** обмен: `order.confirmed` (событие, несколько подписчиков – review, notification), `payment.completed` (событие, оркестратор – order), задачи с retry и DLQ (уведомления). RabbitMQ даёт маршрутизацию через exchanges, гарантию доставки, dead-letter queue «из коробки».|
 | **Nginx** | все 6 сервисов (через него идут запросы от клиента), Keycloak (проверка JWT) | Требуется **единая точка входа**: маршрутизация по пути к сервисам, проверка JWT (связка с Keycloak), rate limiting, TLS-терминация. Nginx лёгкий, стабильный, прост в конфигурировании; функционала хватает. |
 | **Keycloak** | Gateway + все сервисы (проверка JWT) | Требуется OAuth 2.0 / OpenID Connect «без собственной реализации». Keycloak даёт готовые роли, refresh-токены и интеграцию с Nginx. Собственный user-service запрещён ТЗ. |
 | **MinIO** | catalog | Обложки книг – бинарные объекты. Хранить их в PostgreSQL (BYTEA) является антипаттерном, который раздувает БД, ломает бэкапы. |
@@ -320,7 +320,106 @@
 
 ## 4. Схемы взаимодействий
 
-*Заполняется на Шаге 4.*
+### 4.1. Архитектурная схема
+
+![Архитектурная схема](docs/architecture.png)
+
+**Обозначения:**
+- Сплошные стрелки – синхронные вызовы (REST / HTTPS)
+- Пунктирные – асинхронные события через RabbitMQ
+
+### 4.2. Диаграммы последовательности
+
+![Успешный сценарий](docs/sequence-success.png)
+
+![Сбой оплаты](docs/sequence-failure.png)
+
+### 4.3. Таблица взаимодействий
+
+#### Синхронные вызовы – клиент через Gateway (public API)
+
+| № | Инициатор → Получатель | Протокол | Эндпоинт | Назначение |
+|---|------------------------|----------|----------|------------|
+| 1 | client → Gateway → catalog | REST | `GET /api/v1/books` | список книг с фильтрами и пагинацией |
+| 2 | client → Gateway → catalog | REST | `GET /api/v1/books/{id}` | карточка книги |
+| 3 | client → Gateway → order | REST | `POST /api/v1/cart/items` | добавить в корзину |
+| 4 | client → Gateway → order | REST | `GET /api/v1/cart` | получить корзину |
+| 5 | client → Gateway → order | REST | `POST /api/v1/orders` | оформить заказ (Idempotency-Key) |
+| 6 | client → Gateway → order | REST | `GET /api/v1/orders/{id}` | статус заказа |
+| 7 | client → Gateway → order | REST | `GET /api/v1/orders` | история заказов (пагинация) |
+| 8 | client → Gateway → payment | REST | `GET /api/v1/payments/{id}` | статус платежа (read-only) |
+| 9 | client → Gateway → review | REST | `GET /api/v1/books/{id}/reviews` | список отзывов книги |
+| 10 | client → Gateway → review | REST | `POST /api/v1/books/{id}/reviews` | оставить отзыв (Idempotency-Key) |
+| 11 | manager → Gateway → catalog | REST | `POST /api/v1/admin/books` | добавить книгу |
+| 12 | manager → Gateway → catalog | REST | `PUT /api/v1/admin/books/{id}` | редактировать книгу |
+| 13 | manager → Gateway → inventory | REST | `POST /api/v1/admin/stock` | приход/расход остатка |
+| 14 | moderator → Gateway → review | REST | `POST /api/v1/admin/reviews/{id}/moderate` | модерация отзыва |
+| 15 | Gateway → Keycloak | HTTPS | `GET /realms/.../certs` | проверка JWT (кешируется) |
+
+#### Синхронные вызовы – сервис-к-сервису (internal, напрямую, минуя Gateway)
+
+| № | Инициатор → Получатель | Протокол | Эндпоинт | Назначение |
+|---|------------------------|----------|----------|------------|
+| 16 | order → catalog | REST | `GET /internal/v1/books:batch` | актуальные цены и названия для корзины |
+| 17 | order → inventory | REST | `POST /internal/v1/reservations` | зарезервировать экземпляры (Idempotency-Key) |
+| 18 | order → payment | REST | `POST /internal/v1/payments` | создать платёж (Idempotency-Key) |
+| 19 | order → inventory | REST | `DELETE /internal/v1/reservations/{orderId}` | снять резерв (компенсация) |
+| 20 | order → payment | REST | `POST /internal/v1/refunds` | инициировать возврат (компенсация) |
+
+#### Синхронные вызовы – к внешним системам
+
+| № | Инициатор → Получатель | Протокол | Эндпоинт | Назначение |
+|---|------------------------|----------|----------|------------|
+| 21 | payment → Payment Gateway | HTTPS | `POST /payments` | создать платёжную сессию, получить `paymentUrl` |
+| 22 | Payment Gateway → payment | HTTPS | webhook `payment.succeeded` / `payment.failed` | уведомление о результате оплаты |
+| 23 | notification → MailHog (dev) | SMTP | `send` | отправка письма клиенту (в проде – SendGrid/аналог) |
+
+#### Асинхронные – публикация событий (RabbitMQ)
+
+| № | Издатель | Событие | Назначение |
+|---|----------|---------|------------|
+| 24 | order | `order.created` | заказ создан, ожидает оплаты |
+| 25 | order | `order.confirmed` | оплата прошла, заказ подтверждён |
+| 26 | order | `order.cancelled` | заказ отменён (в т.ч. при сбое оплаты) |
+| 27 | order | `order.expired` | заказ не оплачен за TTL |
+| 28 | payment | `payment.completed` | оплата успешно завершена |
+| 29 | payment | `payment.failed` | оплата отклонена |
+| 30 | payment | `payment.refunded` | возврат выполнен |
+| 31 | inventory | `stock.reserved` | резерв создан |
+| 32 | inventory | `stock.released` | резерв снят (компенсация) |
+| 33 | inventory | `stock.reservation.expired` | TTL резерва истёк |
+| 34 | review | `review.published` | отзыв одобрен модератором |
+| 35 | notification | `notification.sent` | письмо отправлено |
+| 36 | notification | `notification.failed` | ошибка отправки (после retry) |
+
+#### Асинхронные – подписка на события (RabbitMQ)
+
+| № | Подписчик | Событие | Реакция |
+|---|-----------|---------|---------|
+| 37 | order | `payment.completed` | перевести заказ в `CONFIRMED` |
+| 38 | order | `payment.failed` | перевести заказ в `CANCELLED`, запустить компенсацию |
+| 39 | order | `payment.refunded` | пометить заказ как полностью возвращённый |
+| 40 | payment | `order.expired` | если оплата прошла позже – инициировать возврат |
+| 41 | inventory | `order.confirmed` | подтвердить резерв, списать остаток |
+| 42 | inventory | `order.cancelled` | снять резерв (компенсация) |
+| 43 | inventory | `order.expired` | снять резерв (компенсация) |
+| 44 | review | `order.confirmed` | создать запись «ожидает отзыва» с флагом `verified_purchase` |
+| 45 | notification | `order.confirmed` | отправить письмо с деталями заказа и чеком |
+| 46 | notification | `order.cancelled` | отправить письмо об отмене |
+| 47 | notification | `order.expired` | напомнить, что заказ сгорел |
+| 48 | notification | `payment.completed` | отправить чек об оплате |
+| 49 | notification | `payment.failed` | уведомить об ошибке оплаты |
+| 50 | notification | `review.published` | пригласить клиента оставить отзыв |
+
+#### Сага покупки – компенсации при сбоях
+
+| Сбой | Компенсирующее действие |
+|------|-------------------------|
+| Payment вернул `payment.failed` | order → `CANCELLED`, публикует `order.cancelled` → inventory снимает резерв |
+| Клиент не оплатил за 15 минут | TTL резерва истекает → `stock.reservation.expired` → order публикует `order.expired` |
+| Оплата пришла после `order.expired` | payment подписан на `order.expired` → инициирует `refund` → `payment.refunded` |
+| Дубликат события (retry) | все consumer'ы хранят обработанные `eventId`, повтор игнорируется (идемпотентность) |
+| inventory недоступен при компенсации | сообщение остаётся в очереди, retry с backoff, после N попыток → DLQ |
 
 ---
 
