@@ -1,0 +1,205 @@
+openapi: 3.1.0
+
+info:
+  title: notification-service
+  version: 1.0.0
+  description: |
+    Сервис уведомлений. Подписан на бизнес-события (заказы, оплаты, отзывы)
+    и отправляет email-сообщения через провайдера (в dev-окружении MailHog).
+    Использует MongoDB для хранения журнала отправок с гибкой структурой payload.
+    Публичных клиентских эндпоинтов нет, только внутренние для поддержки/отладки.
+  license:
+    name: Educational project
+    url: https://example.org/license
+
+servers:
+  - url: /
+    description: Internal only
+
+tags:
+  - name: internal
+    description: Внутренние эндпоинты для других сервисов и администраторов
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /internal/v1/notifications:
+    get:
+      tags: [internal]
+      summary: Журнал отправок (для поддержки и отладки)
+      description: Возвращает историю попыток отправки писем с фильтрацией.
+      operationId: listNotifications
+      security: []
+      parameters:
+        - name: orderId
+          in: query
+          description: Фильтр по связанному заказу
+          schema: { type: string, format: uuid }
+        - name: status
+          in: query
+          description: Фильтр по статусу отправки
+          schema: { type: string, enum: [QUEUED, SENT, FAILED] }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Страница уведомлений
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedNotifications'
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /internal/v1/notifications/{id}:
+    get:
+      tags: [internal]
+      summary: Детали конкретного уведомления
+      operationId: getNotification
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Детали уведомления
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /internal/v1/notifications/{id}/retry:
+    post:
+      tags: [internal]
+      summary: Повторить отправку (ручной retry для поддержки)
+      description: Используется, если автоматические retry исчерпаны.
+      operationId: retryNotification
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '202':
+          description: Задача на повторную отправку принята
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409':
+          description: Уведомление уже успешно отправлено
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 0, default: 0 }
+    Size:
+      name: size
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Уведомление не найдено
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:     { type: string, format: uri }
+        title:    { type: string }
+        status:   { type: integer }
+        detail:   { type: string }
+        instance: { type: string }
+        correlationId: { type: string, format: uuid }
+
+    NotificationStatus:
+      type: string
+      enum: [QUEUED, SENT, FAILED]
+
+    NotificationType:
+      type: string
+      enum:
+        - ORDER_CONFIRMED
+        - ORDER_CANCELLED
+        - ORDER_EXPIRED
+        - PAYMENT_FAILED
+        - REVIEW_PUBLISHED
+      description: Тип события, по которому отправлено уведомление
+
+    Notification:
+      type: object
+      required: [id, recipientEmail, type, status, createdAt]
+      properties:
+        id:             { type: string, format: uuid }
+        recipientEmail: { type: string, format: email }
+        type:           { $ref: '#/components/schemas/NotificationType' }
+        status:         { $ref: '#/components/schemas/NotificationStatus' }
+        subject:        { type: string, maxLength: 200, description: "Тема письма" }
+        payload:
+          type: object
+          description: Данные, подставленные в шаблон письма (JSON)
+        providerMessageId: { type: string, description: "ID письма у провайдера" }
+        errorMessage:   { type: string, description: "Причина ошибки при status=FAILED" }
+        retryCount:     { type: integer, default: 0 }
+        createdAt:      { type: string, format: date-time }
+        sentAt:         { type: string, format: date-time }
+      example:
+        id: "7d8e9f0a-1b2c-3d4e-5f6a-7b8c9d0e1f2a"
+        recipientEmail: "ivan@example.com"
+        type: "ORDER_CONFIRMED"
+        status: "SENT"
+        subject: "Ваш заказ #9a4d1e2c оформлен"
+        payload:
+          orderId: "9a4d1e2c-6b7f-4a08-b3c5-0e1f2d3c4b5a"
+          totalAmount: 900.00
+        providerMessageId: "msg_abc123"
+        retryCount: 0
+        createdAt: "2026-10-17T10:00:00Z"
+        sentAt: "2026-10-17T10:00:02Z"
+
+    PaginatedNotifications:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/Notification' }
+        page:          { type: integer }
+        size:          { type: integer }
+        totalElements: { type: integer }
+        totalPages:    { type: integer }
