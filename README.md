@@ -427,4 +427,24 @@
 
 ## 5. Контракты API
 
-*Заполняется на Шаге 5.*
+### 5.1. Спецификации API
+
+| Сервис | Спецификация |
+|--------|--------------|
+| order-service | [order-service.yaml](api/order-service.yaml) |
+| catalog-service | [catalog-service.yaml](api/catalog-service.yaml) |
+| inventory-service | [inventory-service.yaml](api/inventory-service.yaml) |
+| payment-service | [payment-service.yaml](api/payment-service.yaml) |
+| review-service | [review-service.yaml](api/review-service.yaml) |
+| notification-service | [notification-service.yaml](api/notification-service.yaml) |
+
+### 5.2. Асинхронные события
+
+Спецификация событий: [events.yaml](api/events.yaml) (AsyncAPI 2.6.0).
+
+Основные топики:
+- `orders` – order.created, order.confirmed, order.cancelled, order.expired
+- `payments` – payment.completed, payment.failed, payment.refunded
+- `inventory` – stock.reserved, stock.released, stock.reservation.expired
+- `reviews` – review.published
+
