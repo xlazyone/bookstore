@@ -1,0 +1,391 @@
+openapi: 3.1.0
+
+info:
+  title: catalog-service
+  version: 1.0.0
+  description: |
+    Сервис каталога: книги, авторы, жанры, цены, поиск и фильтрация.
+    Public-эндпоинты доступны через API Gateway (JWT).
+    Internal-эндпоинты вызываются другими сервисами напрямую.
+  license:
+    name: Educational project
+    url: https://example.org/license
+
+servers:
+  - url: /
+    description: API Gateway (public endpoints)
+
+tags:
+  - name: books
+    description: Каталог книг
+  - name: admin
+    description: Управление каталогом (роль MANAGER)
+  - name: internal
+    description: Внутренние эндпоинты для других сервисов
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /api/v1/books:
+    get:
+      tags: [books]
+      summary: Список книг с фильтрами и пагинацией
+      operationId: listBooks
+      parameters:
+        - name: q
+          in: query
+          description: Полнотекстовый поиск по названию и автору
+          schema: { type: string, maxLength: 200 }
+        - name: genreId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: authorId
+          in: query
+          schema: { type: string, format: uuid }
+        - name: minPrice
+          in: query
+          schema: { type: number, format: double, minimum: 0 }
+        - name: maxPrice
+          in: query
+          schema: { type: number, format: double, minimum: 0 }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Страница книг
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedBooks'
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /api/v1/books/{id}:
+    get:
+      tags: [books]
+      summary: Карточка книги
+      operationId: getBook
+      parameters:
+        - $ref: '#/components/parameters/BookIdPath'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Книга
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/genres:
+    get:
+      tags: [books]
+      summary: Список жанров
+      operationId: listGenres
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Жанры
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Genre' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /api/v1/authors/{id}:
+    get:
+      tags: [books]
+      summary: Информация об авторе
+      operationId: getAuthor
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Автор
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Author'
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/books:
+    post:
+      tags: [admin]
+      summary: Добавить книгу в каталог
+      description: Требуется роль MANAGER.
+      operationId: createBook
+      parameters:
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookRequest'
+      responses:
+        '201':
+          description: Книга создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/admin/books/{id}:
+    put:
+      tags: [admin]
+      summary: Обновить книгу
+      operationId: updateBook
+      parameters:
+        - $ref: '#/components/parameters/BookIdPath'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBookRequest'
+      responses:
+        '200':
+          description: Книга обновлена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      tags: [admin]
+      summary: Снять книгу с продажи
+      operationId: discontinueBook
+      parameters:
+        - $ref: '#/components/parameters/BookIdPath'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: Книга снята с продажи
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /internal/v1/books/{id}:
+    get:
+      tags: [internal]
+      summary: Карточка книги (для внутренних вызовов)
+      operationId: getBookInternal
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/BookIdPath'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Книга
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Book'
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /internal/v1/books:batch:
+    get:
+      tags: [internal]
+      summary: Пакетная выдача книг по списку ID
+      description: Используется order-service при расчёте корзины.
+      operationId: getBooksBatch
+      security: []
+      parameters:
+        - name: ids
+          in: query
+          required: true
+          description: Список ID через запятую
+          schema:
+            type: array
+            items: { type: string, format: uuid }
+            minItems: 1
+            maxItems: 100
+          style: form
+          explode: false
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Найденные книги
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Book' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+    BookIdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 0, default: 0 }
+    Size:
+      name: size
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Доступ запрещён
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Ресурс не найден
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Конфликт (например, ISBN уже существует)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:     { type: string, format: uri }
+        title:    { type: string }
+        status:   { type: integer }
+        detail:   { type: string }
+        instance: { type: string }
+        correlationId: { type: string, format: uuid }
+
+    Author:
+      type: object
+      required: [id, name]
+      properties:
+        id:   { type: string, format: uuid }
+        name: { type: string, maxLength: 200 }
+        bio:  { type: string, maxLength: 2000 }
+
+    Genre:
+      type: object
+      required: [id, name]
+      properties:
+        id:   { type: string, format: uuid }
+        name: { type: string, maxLength: 100 }
+
+    Book:
+      type: object
+      required: [id, isbn, title, author, genre, price, currency, coverUrl]
+      properties:
+        id:          { type: string, format: uuid }
+        isbn:        { type: string, pattern: '^(97(8|9))?\d{9}(\d|X)$' }
+        title:       { type: string, maxLength: 300 }
+        description: { type: string, maxLength: 5000 }
+        author:      { $ref: '#/components/schemas/Author' }
+        genre:       { $ref: '#/components/schemas/Genre' }
+        price:       { type: number, format: double, minimum: 0 }
+        currency:    { type: string, default: RUB }
+        coverUrl:    { type: string, format: uri, description: Ссылка на обложку в MinIO }
+        active:      { type: boolean, default: true }
+        createdAt:   { type: string, format: date-time }
+        updatedAt:   { type: string, format: date-time }
+      example:
+        id: "9a4d1e2c-6b7f-4a08-b3c5-0e1f2d3c4b5a"
+        isbn: "9783161484100"
+        title: "Мастер и Маргарита"
+        description: "Роман о добре и зле, любви и трусости."
+        author:
+          id: "1e2d3c4b-5a69-7081-92a3-b4c5d6e7f809"
+          name: "Михаил Булгаков"
+        genre:
+          id: "2f3e4d5c-6b7a-8192-a3b4-c5d6e7f80912"
+          name: "Роман"
+        price: 900.00
+        currency: RUB
+        coverUrl: "http://minio.local/covers/9783161484100.jpg"
+        active: true
+
+    BookSummary:
+      type: object
+      required: [id, title, author, price, currency]
+      properties:
+        id:        { type: string, format: uuid }
+        title:     { type: string }
+        author:    { $ref: '#/components/schemas/Author' }
+        price:     { type: number, format: double }
+        currency:  { type: string }
+        coverUrl:  { type: string, format: uri }
+
+    CreateBookRequest:
+      type: object
+      required: [isbn, title, authorId, genreId, price]
+      properties:
+        isbn:        { type: string, pattern: '^(97(8|9))?\d{9}(\d|X)$' }
+        title:       { type: string, maxLength: 300 }
+        description: { type: string, maxLength: 5000 }
+        authorId:    { type: string, format: uuid }
+        genreId:     { type: string, format: uuid }
+        price:       { type: number, format: double, minimum: 0 }
+        currency:    { type: string, default: RUB }
+
+    UpdateBookRequest:
+      type: object
+      properties:
+        title:       { type: string, maxLength: 300 }
+        description: { type: string, maxLength: 5000 }
+        genreId:     { type: string, format: uuid }
+        price:       { type: number, format: double, minimum: 0 }
+        active:      { type: boolean }
+
+    PaginatedBooks:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/BookSummary' }
+        page:          { type: integer }
+        size:          { type: integer }
+        totalElements: { type: integer }
+        totalPages:    { type: integer }
