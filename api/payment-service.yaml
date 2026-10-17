@@ -1,0 +1,273 @@
+openapi: 3.1.0
+
+info:
+  title: payment-service
+  version: 1.0.0
+  description: |
+    Сервис платежей: интеграция с внешним шлюзом, обработка вебхуков, возвраты.
+    Все операции создания платежа и возврата строго идемпотентны.
+    Вебхуки принимаются от внешней системы без JWT, но с проверкой подписи.
+  license:
+    name: Educational project
+    url: https://example.org/license
+
+servers:
+  - url: /
+    description: API Gateway (public endpoints)
+
+tags:
+  - name: payments
+    description: Публичная информация о платежах
+  - name: internal
+    description: Внутренние эндпоинты для order-service
+  - name: webhooks
+    description: Эндпоинты для внешнего платежного шлюза
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /api/v1/payments/{id}:
+    get:
+      tags: [payments]
+      summary: Получить статус платежа
+      description: Клиент проверяет статус оплаты после возврата с внешнего шлюза.
+      operationId: getPayment
+      parameters:
+        - $ref: '#/components/parameters/PaymentIdPath'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Платёж
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /internal/v1/payments:
+    post:
+      tags: [internal]
+      summary: Создать платёж
+      description: |
+        Вызывается order-service при оформлении заказа.
+        Строго идемпотентно по Idempotency-Key.
+      operationId: createPayment
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePaymentRequest'
+            example:
+              orderId: "9a4d1e2c-6b7f-4a08-b3c5-0e1f2d3c4b5a"
+              amount: 900.00
+              currency: RUB
+      responses:
+        '201':
+          description: Платёж создан, получена ссылка на оплату
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Payment'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /internal/v1/refunds:
+    post:
+      tags: [internal]
+      summary: Инициализировать возврат
+      description: |
+        Вызывается order-service или фоновым воркером (если оплата пришла после истечения заказа).
+      operationId: createRefund
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRefundRequest'
+      responses:
+        '201':
+          description: Возврат создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Refund'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /api/v1/payments/webhook:
+    post:
+      tags: [webhooks]
+      summary: Вебхук от платежного шлюза
+      description: |
+        Внешняя система уведомляет нас об успехе или отказе оплаты.
+        Требует валидную подпись в заголовке X-Signature (секрет шлюза).
+      operationId: handlePaymentWebhook
+      security: [] # Отключаем JWT, защищаемся подписью
+      parameters:
+        - name: X-Signature
+          in: header
+          required: true
+          description: HMAC-SHA256 подпись тела запроса
+          schema: { type: string }
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WebhookPayload'
+            example:
+              eventId: "3f6c2b0e-8d1a-4c57-9e2f-5a1b7c9d0e44"
+              paymentId: "b2e0c7f4-1a93-4f0d-8c6e-7d25a1e9f310"
+              status: SUCCEEDED
+              amount: 900.00
+      responses:
+        '200':
+          description: Вебхук обработан
+        '400':
+          description: Неверный формат
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '401':
+          description: Неверная подпись
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Уникальный ключ для предотвращения дублирования платежа
+      schema: { type: string, format: uuid }
+    PaymentIdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Доступ запрещён (например, чужой платеж)
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Платёж не найден
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    UnprocessableEntity:
+      description: Ошибка бизнес-валидации
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:     { type: string, format: uri }
+        title:    { type: string }
+        status:   { type: integer }
+        detail:   { type: string }
+        instance: { type: string }
+        correlationId: { type: string, format: uuid }
+
+    PaymentStatus:
+      type: string
+      enum: [INITIATED, COMPLETED, FAILED, REFUNDED]
+
+    Payment:
+      type: object
+      required: [id, orderId, amount, currency, status, createdAt]
+      properties:
+        id:         { type: string, format: uuid }
+        orderId:    { type: string, format: uuid }
+        amount:     { type: number, format: double, minimum: 0 }
+        currency:   { type: string }
+        status:     { $ref: '#/components/schemas/PaymentStatus' }
+        paymentUrl: { type: string, format: uri, description: Ссылка для редиректа клиента }
+        createdAt:  { type: string, format: date-time }
+        updatedAt:  { type: string, format: date-time }
+
+    CreatePaymentRequest:
+      type: object
+      required: [orderId, amount, currency]
+      properties:
+        orderId:  { type: string, format: uuid }
+        amount:   { type: number, format: double, minimum: 1 }
+        currency: { type: string, default: RUB }
+
+    RefundStatus:
+      type: string
+      enum: [PENDING, COMPLETED, FAILED]
+
+    Refund:
+      type: object
+      required: [id, paymentId, amount, status, createdAt]
+      properties:
+        id:        { type: string, format: uuid }
+        paymentId: { type: string, format: uuid }
+        amount:    { type: number, format: double, minimum: 0 }
+        status:    { $ref: '#/components/schemas/RefundStatus' }
+        reason:    { type: string }
+        createdAt: { type: string, format: date-time }
+
+    CreateRefundRequest:
+      type: object
+      required: [paymentId, amount, reason]
+      properties:
+        paymentId: { type: string, format: uuid }
+        amount:    { type: number, format: double, minimum: 1 }
+        reason:    { type: string, maxLength: 200 }
+
+    WebhookPayload:
+      type: object
+      required: [eventId, paymentId, status, amount]
+      properties:
+        eventId:   { type: string, format: uuid, description: Для идемпотентности вебхука }
+        paymentId: { type: string, format: uuid }
+        status:    { type: string, enum: [SUCCEEDED, FAILED], description: Статус от шлюза }
+        amount:    { type: number, format: double }
