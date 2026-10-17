@@ -1,0 +1,265 @@
+openapi: 3.1.0
+
+info:
+  title: review-service
+  version: 1.0.0
+  description: |
+    Сервис отзывов и рейтингов.
+    Использует документную БД MongoDB, так как отзывы имеют гибкую структуру.
+    Флаг "покупка подтверждена" устанавливается асинхронно при получении
+    события order.confirmed от order-service.
+  license:
+    name: Educational project
+    url: https://example.org/license
+
+servers:
+  - url: /
+    description: API Gateway (public endpoints)
+
+tags:
+  - name: reviews
+    description: Чтение и создание отзывов
+  - name: admin
+    description: Модерация отзывов (роль MODERATOR)
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /api/v1/books/{bookId}/rating:
+    get:
+      tags: [reviews]
+      summary: Получить агрегированный рейтинг книги
+      operationId: getBookRating
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/BookIdPath'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Рейтинг книги
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Rating'
+
+  /api/v1/books/{bookId}/reviews:
+    get:
+      tags: [reviews]
+      summary: Получить список опубликованных отзывов о книге
+      operationId: listReviews
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/BookIdPath'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Страница отзывов
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedReviews'
+        '400': { $ref: '#/components/responses/BadRequest' }
+    
+    post:
+      tags: [reviews]
+      summary: Оставить отзыв
+      description: |
+        Требует JWT. Если пользователь покупал книгу, отзыв получит флаг verifiedPurchase.
+        Требует Idempotency-Key для защиты от случайных дублей при двойном клике.
+      operationId: createReview
+      parameters:
+        - $ref: '#/components/parameters/BookIdPath'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReviewRequest'
+            example:
+              rating: 5
+              text: "Отличная книга, прочитал на одном дыхании!"
+      responses:
+        '201':
+          description: Отзыв создан и отправлен на модерацию
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /api/v1/admin/reviews/{id}/moderate:
+    post:
+      tags: [admin]
+      summary: Модерация отзыва
+      description: Требуется роль MODERATOR.
+      operationId: moderateReview
+      parameters:
+        - $ref: '#/components/parameters/ReviewIdPath'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ModerateReviewRequest'
+      responses:
+        '200':
+          description: Статус изменён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Review'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+    BookIdPath:
+      name: bookId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ReviewIdPath:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 0, default: 0 }
+    Size:
+      name: size
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Доступ запрещён
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Отзыв не найден
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Пользователь уже оставил отзыв на эту книгу
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:     { type: string, format: uri }
+        title:    { type: string }
+        status:   { type: integer }
+        detail:   { type: string }
+        instance: { type: string }
+        correlationId: { type: string, format: uuid }
+
+    ReviewStatus:
+      type: string
+      enum: [PENDING, PUBLISHED, REJECTED]
+
+    Review:
+      type: object
+      required: [id, bookId, userId, userName, rating, status, verifiedPurchase, createdAt]
+      properties:
+        id:               { type: string, format: uuid }
+        bookId:           { type: string, format: uuid }
+        userId:           { type: string, format: uuid }
+        userName:         { type: string, description: "Имя пользователя (денормализация)" }
+        rating:           { type: integer, minimum: 1, maximum: 5 }
+        text:             { type: string, maxLength: 2000 }
+        status:           { $ref: '#/components/schemas/ReviewStatus' }
+        verifiedPurchase: { type: boolean, description: "Купил ли пользователь эту книгу" }
+        createdAt:        { type: string, format: date-time }
+        moderatedAt:      { type: string, format: date-time }
+      example:
+        id: "5c4b3a21-9d8e-4f7a-8b6c-1d2e3f4a5b6c"
+        bookId: "9a4d1e2c-6b7f-4a08-b3c5-0e1f2d3c4b5a"
+        userId: "0e1f2d3c-4b5a-6c7d-8e9f-0a1b2c3d4e5f"
+        userName: "Иван П."
+        rating: 5
+        text: "Отличная книга!"
+        status: "PUBLISHED"
+        verifiedPurchase: true
+        createdAt: "2026-10-17T10:00:00Z"
+
+    CreateReviewRequest:
+      type: object
+      required: [rating]
+      properties:
+        rating: { type: integer, minimum: 1, maximum: 5 }
+        text:   { type: string, maxLength: 2000 }
+
+    ModerateReviewRequest:
+      type: object
+      required: [action]
+      properties:
+        action: { type: string, enum: [APPROVE, REJECT] }
+        reason: { type: string, maxLength: 500, description: "Обязательно, если action = REJECT" }
+
+    Rating:
+      type: object
+      required: [bookId, averageRating, totalReviews]
+      properties:
+        bookId:        { type: string, format: uuid }
+        averageRating: { type: number, format: double, minimum: 0, maximum: 5 }
+        totalReviews:  { type: integer, minimum: 0 }
+
+    PaginatedReviews:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/Review' }
+        page:          { type: integer }
+        size:          { type: integer }
+        totalElements: { type: integer }
+        totalPages:    { type: integer }
