@@ -442,9 +442,17 @@
 
 Спецификация событий: [events.yaml](api/events.yaml) (AsyncAPI 2.6.0).
 
-Основные топики:
-- `orders` – order.created, order.confirmed, order.cancelled, order.expired
-- `payments` – payment.completed, payment.failed, payment.refunded
-- `inventory` – stock.reserved, stock.released, stock.reservation.expired
-- `reviews` – review.published
+| Событие | Топик (RabbitMQ) | Издатель | Подписчики | Ссылка на схему в `events.yaml` |
+|---------|------------------|----------|------------|---------------------------------|
+| `order.created` | `orders` | order-service | – | `#/components/messages/OrderCreated` |
+| `order.confirmed` | `orders` | order-service | inventory, review, notification | `#/components/messages/OrderConfirmed` |
+| `order.cancelled` | `orders` | order-service | inventory, notification | `#/components/messages/OrderCancelled` |
+| `order.expired` | `orders` | order-service | payment, notification | `#/components/messages/OrderExpired` |
+| `payment.completed` | `payments` | payment-service | order, notification | `#/components/messages/PaymentCompleted` |
+| `payment.failed` | `payments` | payment-service | order, notification | `#/components/messages/PaymentFailed` |
+| `payment.refunded` | `payments` | payment-service | order | `#/components/messages/PaymentRefunded` |
+| `stock.reserved` | `inventory` | inventory-service | – | `#/components/messages/StockReserved` |
+| `stock.released` | `inventory` | inventory-service | – | `#/components/messages/StockReleased` |
+| `stock.reservation.expired`| `inventory` | inventory-service | order | `#/components/messages/StockReservationExpired` |
+| `review.published` | `reviews` | review-service | notification | `#/components/messages/ReviewPublished` |
 
