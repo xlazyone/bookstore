@@ -1,0 +1,300 @@
+asyncapi: 2.6.0
+
+info:
+  title: BookStore Events
+  version: 1.0.0
+  description: |
+    Асинхронные события и команды, циркулирующие между сервисами BookStore
+    через RabbitMQ. Все события используют единый конверт (EventEnvelope).
+    Обмен происходит через topic exchanges.
+  license:
+    name: Educational project
+    url: https://example.org/license
+
+defaultContentType: application/json
+
+servers:
+  production:
+    url: amqp://rabbitmq:5672
+    protocol: amqp
+    description: RabbitMQ broker
+
+channels:
+
+  orders:
+    description: События жизненного цикла заказов
+    publish:
+      operationId: publishOrderEvent
+      summary: Публикуется order-service
+      message:
+        oneOf:
+          - $ref: '#/components/messages/OrderCreated'
+          - $ref: '#/components/messages/OrderConfirmed'
+          - $ref: '#/components/messages/OrderCancelled'
+          - $ref: '#/components/messages/OrderExpired'
+    subscribe:
+      operationId: subscribeOrderEvents
+      summary: Подписчики — inventory, review, notification
+      message:
+        oneOf:
+          - $ref: '#/components/messages/OrderCreated'
+          - $ref: '#/components/messages/OrderConfirmed'
+          - $ref: '#/components/messages/OrderCancelled'
+          - $ref: '#/components/messages/OrderExpired'
+
+  payments:
+    description: События платежей
+    publish:
+      operationId: publishPaymentEvent
+      summary: Публикуется payment-service
+      message:
+        oneOf:
+          - $ref: '#/components/messages/PaymentCompleted'
+          - $ref: '#/components/messages/PaymentFailed'
+          - $ref: '#/components/messages/PaymentRefunded'
+    subscribe:
+      operationId: subscribePaymentEvents
+      summary: Подписчики — order, notification
+      message:
+        oneOf:
+          - $ref: '#/components/messages/PaymentCompleted'
+          - $ref: '#/components/messages/PaymentFailed'
+          - $ref: '#/components/messages/PaymentRefunded'
+
+  inventory:
+    description: События склада
+    publish:
+      operationId: publishInventoryEvent
+      summary: Публикуется inventory-service
+      message:
+        oneOf:
+          - $ref: '#/components/messages/StockReserved'
+          - $ref: '#/components/messages/StockReleased'
+          - $ref: '#/components/messages/StockReservationExpired'
+    subscribe:
+      operationId: subscribeInventoryEvents
+      summary: Подписчик — order-service
+      message:
+        oneOf:
+          - $ref: '#/components/messages/StockReserved'
+          - $ref: '#/components/messages/StockReleased'
+          - $ref: '#/components/messages/StockReservationExpired'
+
+  reviews:
+    description: События отзывов
+    publish:
+      operationId: publishReviewEvent
+      summary: Публикуется review-service
+      message:
+        $ref: '#/components/messages/ReviewPublished'
+    subscribe:
+      operationId: subscribeReviewEvents
+      summary: Подписчик — notification
+      message:
+        $ref: '#/components/messages/ReviewPublished'
+
+components:
+
+  messages:
+
+    OrderCreated:
+      name: order.created
+      title: Заказ создан
+      description: Публикуется при создании заказа в статусе PENDING_PAYMENT.
+      payload:
+        $ref: '#/components/schemas/OrderCreatedPayload'
+
+    OrderConfirmed:
+      name: order.confirmed
+      title: Заказ подтверждён
+      description: Публикуется после успешной оплаты. Триггерит списание остатка, отправку письма и создание черновика отзыва.
+      payload:
+        $ref: '#/components/schemas/OrderConfirmedPayload'
+
+    OrderCancelled:
+      name: order.cancelled
+      title: Заказ отменён
+      description: Публикуется при отмене клиентом или при отказе оплаты. Триггерит компенсацию (снятие резерва).
+      payload:
+        $ref: '#/components/schemas/OrderEventPayload'
+
+    OrderExpired:
+      name: order.expired
+      title: Заказ истёк
+      description: Публикуется, если клиент не оплатил заказ за 15 минут.
+      payload:
+        $ref: '#/components/schemas/OrderEventPayload'
+
+    PaymentCompleted:
+      name: payment.completed
+      title: Платёж выполнен
+      payload:
+        $ref: '#/components/schemas/PaymentEventPayload'
+
+    PaymentFailed:
+      name: payment.failed
+      title: Платёж отклонён
+      payload:
+        $ref: '#/components/schemas/PaymentEventPayload'
+
+    PaymentRefunded:
+      name: payment.refunded
+      title: Возврат средств
+      payload:
+        $ref: '#/components/schemas/PaymentRefundedPayload'
+
+    StockReserved:
+      name: stock.reserved
+      title: Остаток зарезервирован
+      payload:
+        $ref: '#/components/schemas/StockEventPayload'
+
+    StockReleased:
+      name: stock.released
+      title: Резерв снят
+      payload:
+        $ref: '#/components/schemas/StockEventPayload'
+
+    StockReservationExpired:
+      name: stock.reservation.expired
+      title: Резерв истёк по TTL
+      payload:
+        $ref: '#/components/schemas/StockEventPayload'
+
+    ReviewPublished:
+      name: review.published
+      title: Отзыв опубликован
+      payload:
+        $ref: '#/components/schemas/ReviewPublishedPayload'
+
+  schemas:
+
+    EventEnvelope:
+      type: object
+      description: Единый конверт для всех событий системы
+      required: [eventId, eventType, schemaVersion, occurredAt, correlationId, payload]
+      properties:
+        eventId:
+          type: string
+          format: uuid
+          description: Уникальный ID события (для идемпотентности)
+        eventType:
+          type: string
+          example: order.confirmed
+        schemaVersion:
+          type: integer
+          default: 1
+        occurredAt:
+          type: string
+          format: date-time
+        correlationId:
+          type: string
+          format: uuid
+          description: ID для сквозной трассировки
+        payload:
+          type: object
+
+    OrderCreatedPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            payload:
+              type: object
+              required: [orderId, userId, totalAmount, currency, expiresAt]
+              properties:
+                orderId:     { type: string, format: uuid }
+                userId:      { type: string, format: uuid }
+                totalAmount: { type: number, format: double }
+                currency:    { type: string }
+                expiresAt:   { type: string, format: date-time }
+
+    OrderConfirmedPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            payload:
+              type: object
+              required: [orderId, userId, userEmail, totalAmount, currency, items]
+              properties:
+                orderId:     { type: string, format: uuid }
+                userId:      { type: string, format: uuid }
+                userEmail:   { type: string, format: email, description: Для notification-service }
+                totalAmount: { type: number, format: double }
+                currency:    { type: string }
+                items:
+                  type: array
+                  items:
+                    type: object
+                    required: [bookId, quantity]
+                    properties:
+                      bookId:   { type: string, format: uuid }
+                      quantity: { type: integer }
+
+    OrderEventPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            payload:
+              type: object
+              required: [orderId, reason]
+              properties:
+                orderId: { type: string, format: uuid }
+                reason:  { type: string, example: PAYMENT_FAILED }
+
+    PaymentEventPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            payload:
+              type: object
+              required: [paymentId, orderId, amount, currency, status]
+              properties:
+                paymentId: { type: string, format: uuid }
+                orderId:   { type: string, format: uuid }
+                amount:    { type: number, format: double }
+                currency:  { type: string }
+                status:    { type: string, enum: [COMPLETED, FAILED] }
+
+    PaymentRefundedPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            payload:
+              type: object
+              required: [refundId, paymentId, orderId, amount]
+              properties:
+                refundId:  { type: string, format: uuid }
+                paymentId: { type: string, format: uuid }
+                orderId:   { type: string, format: uuid }
+                amount:    { type: number, format: double }
+
+    StockEventPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            payload:
+              type: object
+              required: [reservationId, orderId]
+              properties:
+                reservationId: { type: string, format: uuid }
+                orderId:       { type: string, format: uuid }
+
+    ReviewPublishedPayload:
+      allOf:
+        - $ref: '#/components/schemas/EventEnvelope'
+        - type: object
+          properties:
+            payload:
+              type: object
+              required: [reviewId, bookId, userId, rating]
+              properties:
+                reviewId: { type: string, format: uuid }
+                bookId:   { type: string, format: uuid }
+                userId:   { type: string, format: uuid }
+                rating:   { type: integer, minimum: 1, maximum: 5 }
