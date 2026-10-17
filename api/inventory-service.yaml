@@ -1,0 +1,293 @@
+openapi: 3.1.0
+
+info:
+  title: inventory-service
+  version: 1.0.0
+  description: |
+    Сервис склада: учёт экземпляров книг, резервирование под заказы с TTL 15 минут.
+    Резервы создаются с идемпотентностью по orderId.
+    Внутренние эндпоинты вызываются order-service напрямую.
+  license:
+    name: Educational project
+    url: https://example.org/license
+
+servers:
+  - url: /
+    description: API Gateway (public endpoints)
+
+tags:
+  - name: stock
+    description: Публичная информация о наличии
+  - name: admin
+    description: Управление складом (роль MANAGER)
+  - name: internal
+    description: Внутренние эндпоинты для других сервисов
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /api/v1/books/{bookId}/stock:
+    get:
+      tags: [stock]
+      summary: Публичный остаток по книге
+      operationId: getPublicStock
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/BookIdPath'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Остаток
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockItem'
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /api/v1/admin/stock:
+    get:
+      tags: [admin]
+      summary: Список складских позиций
+      operationId: listStock
+      parameters:
+        - name: lowStock
+          in: query
+          description: Только позиции с остатком ниже порога
+          schema: { type: boolean, default: false }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '200':
+          description: Страница складских позиций
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedStock'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /api/v1/admin/stock/{bookId}:
+    put:
+      tags: [admin]
+      summary: Изменить остаток (приход/расход)
+      operationId: updateStock
+      parameters:
+        - $ref: '#/components/parameters/BookIdPath'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStockRequest'
+      responses:
+        '200':
+          description: Остаток обновлён
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StockItem'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /internal/v1/reservations:
+    post:
+      tags: [internal]
+      summary: Зарезервировать экземпляры под заказ
+      description: |
+        Создаёт резерв на 15 минут. Идемпотентно по Idempotency-Key
+        (или по orderId в теле). Если резерв уже существует — возвращает его.
+      operationId: createReservation
+      security: []
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReservationRequest'
+            example:
+              orderId: "9a4d1e2c-6b7f-4a08-b3c5-0e1f2d3c4b5a"
+              items:
+                - bookId: "9a4d1e2c-6b7f-4a08-b3c5-0e1f2d3c4b5a"
+                  quantity: 1
+      responses:
+        '201':
+          description: Резерв создан
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reservation'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '409':
+          description: Недостаточно остатка
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /internal/v1/reservations/{orderId}:
+    delete:
+      tags: [internal]
+      summary: Снять резерв (компенсация)
+      description: |
+        Освобождает зарезервированные места. Вызывается order-service
+        при отмене заказа или истечении TTL.
+      operationId: releaseReservation
+      security: []
+      parameters:
+        - name: orderId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/CorrelationId'
+      responses:
+        '204':
+          description: Резерв снят
+        '404': { $ref: '#/components/responses/NotFound' }
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      schema: { type: string, format: uuid }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, format: uuid }
+    BookIdPath:
+      name: bookId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    Page:
+      name: page
+      in: query
+      required: false
+      schema: { type: integer, minimum: 0, default: 0 }
+    Size:
+      name: size
+      in: query
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+
+  responses:
+    BadRequest:
+      description: Некорректный запрос
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Не авторизован
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Доступ запрещён
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Позиция или резерв не найдены
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Конфликт состояния
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    UnprocessableEntity:
+      description: Ошибка бизнес-валидации
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+
+  schemas:
+
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type:     { type: string, format: uri }
+        title:    { type: string }
+        status:   { type: integer }
+        detail:   { type: string }
+        instance: { type: string }
+        correlationId: { type: string, format: uuid }
+
+    StockItem:
+      type: object
+      required: [bookId, available, reserved, updatedAt]
+      properties:
+        bookId:    { type: string, format: uuid }
+        available: { type: integer, minimum: 0, description: "Доступно к резервированию" }
+        reserved:  { type: integer, minimum: 0, description: "Зарезервировано под заказы" }
+        total:     { type: integer, minimum: 0, description: "Всего на складе" }
+        updatedAt: { type: string, format: date-time }
+
+    PaginatedStock:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/StockItem' }
+        page:          { type: integer }
+        size:          { type: integer }
+        totalElements: { type: integer }
+        totalPages:    { type: integer }
+
+    UpdateStockRequest:
+      type: object
+      required: [delta, reason]
+      properties:
+        delta:  { type: integer, description: "Изменение остатка (+приход, -расход)" }
+        reason: { type: string, enum: [RESTOCK, LOSS, CORRECTION], description: Причина изменения }
+
+    ReservationItem:
+      type: object
+      required: [bookId, quantity]
+      properties:
+        bookId:   { type: string, format: uuid }
+        quantity: { type: integer, minimum: 1, maximum: 99 }
+
+    CreateReservationRequest:
+      type: object
+      required: [orderId, items]
+      properties:
+        orderId: { type: string, format: uuid }
+        items:
+          type: array
+          minItems: 1
+          items: { $ref: '#/components/schemas/ReservationItem' }
+
+    Reservation:
+      type: object
+      required: [reservationId, orderId, status, items, expiresAt]
+      properties:
+        reservationId: { type: string, format: uuid }
+        orderId:       { type: string, format: uuid }
+        status:        { type: string, enum: [ACTIVE, CONFIRMED, RELEASED, EXPIRED] }
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/ReservationItem' }
+        expiresAt:     { type: string, format: date-time }
