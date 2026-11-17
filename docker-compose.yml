@@ -1,0 +1,30 @@
+name: bookstore
+
+services:
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: bookstore-rabbitmq
+    hostname: rabbitmq
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    restart: unless-stopped
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    container_name: bookstore-mailhog
+    hostname: mailhog
+    ports:
+      - "1025:1025"     # SMTP
+      - "8025:8025"     # Web UI
+    restart: unless-stopped
