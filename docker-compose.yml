@@ -13,12 +13,16 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms || exit 1"]
       interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    restart: unless-stopped
+      timeout: 10s
+      retries: 10
+      start_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   mailhog:
     image: mailhog/mailhog:latest
@@ -28,3 +32,34 @@ services:
       - "1025:1025"     # SMTP
       - "8025:8025"     # Web UI
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  catalog-service:
+    build:
+      context: .
+      dockerfile: services/catalog/Dockerfile
+    container_name: bookstore-catalog
+    hostname: catalog-service
+    ports:
+      - "8001:8001"
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      CATALOG_DB_DIR: /app/catalog/data
+    volumes:
+      - catalog-data:/app/catalog/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  catalog-data:

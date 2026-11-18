@@ -8,6 +8,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 from typing import Awaitable, Callable, Optional
+import asyncio
 
 import aio_pika
 from aio_pika import ExchangeType, Message
@@ -109,3 +110,24 @@ class Broker:
         await queue.consume(_on_message)
         logger.info("Subscribed queue=%s routing_keys=%s", queue_name, routing_keys)
         return queue
+    
+    async def connect(self, retries: int = 10, base_delay: float = 1.0) -> None:
+        last_error: Exception | None = None
+        for attempt in range(1, retries + 1):
+            try:
+                self.connection = await aio_pika.connect_robust(self.url)
+                self.publish_channel = await self.connection.channel()
+                self.exchange = await self.publish_channel.declare_exchange(
+                    EXCHANGE_NAME, ExchangeType.TOPIC, durable=True
+                )
+                logger.info("Broker connected to %s (attempt %d)", self.url, attempt)
+                return
+            except Exception as exc:
+                last_error = exc
+                delay = min(base_delay * (2 ** (attempt - 1)), 10.0)
+                logger.warning(
+                    "Broker connection attempt %d/%d failed: %s. Retry in %.1fs",
+                    attempt, retries, exc, delay,
+                )
+                await asyncio.sleep(delay)
+        raise RuntimeError(f"Could not connect to broker after {retries} attempts") from last_error
