@@ -85,6 +85,49 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  mock-payment-gateway:
+    build:
+      context: .
+      dockerfile: mocks/payment-gateway/Dockerfile
+    container_name: bookstore-mock-psp
+    hostname: mock-payment-gateway
+    ports:
+      - "8090:8080"
+    environment:
+      PAYMENT_WEBHOOK_URL: http://payment-service:8004/api/v1/payments/webhook
+      PAYMENT_WEBHOOK_SECRET: dev-secret-change-me
+      WEBHOOK_DELAY_SECONDS: "3"
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
+  payment-service:
+    build:
+      context: .
+      dockerfile: services/payment/Dockerfile
+    container_name: bookstore-payment
+    hostname: payment-service
+    ports:
+      - "8004:8004"
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      PAYMENT_DB_DIR: /app/payment/data
+      PAYMENT_GATEWAY_URL: http://mock-payment-gateway:8080
+      PAYMENT_WEBHOOK_SECRET: dev-secret-change-me
+    volumes:
+      - payment-data:/app/payment/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mock-payment-gateway:
+        condition: service_started
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
 volumes:
   catalog-data:
   inventory-data:
+  payment-data:
