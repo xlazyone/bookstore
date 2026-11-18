@@ -60,6 +60,31 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    
+  inventory-service:
+    build:
+      context: .
+      dockerfile: services/inventory/Dockerfile
+    container_name: bookstore-inventory
+    hostname: inventory-service
+    ports:
+      - "8002:8002"
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      INVENTORY_DB_DIR: /app/inventory/data
+      RESERVATION_TTL_MINUTES: "15"
+    volumes:
+      - inventory-data:/app/inventory/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   catalog-data:
+  inventory-data:

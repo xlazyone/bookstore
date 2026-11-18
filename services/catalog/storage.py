@@ -87,24 +87,23 @@ async def seed_if_empty() -> None:
             ('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Фантастика');
         """
     )
-    for isbn, title, desc, author_id, genre_id, price in [
-        ("9783161484100", "Мастер и Маргарита", "Роман о добре и зле",
+    seed_books = [
+        ("9a4d1e2c-6b7f-4a08-b3c5-0e1f2d3c4b5a", "9783161484100", "Мастер и Маргарита", "Роман о добре и зле",
          "11111111-1111-1111-1111-111111111111", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", 900.0),
-        ("9785000000001", "Война и мир", "Роман-эпопея",
+        ("aaaa0001-0001-0001-0001-000000000001", "9785000000001", "Война и мир", "Роман-эпопея",
          "22222222-2222-2222-2222-222222222222", "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", 1200.0),
-        ("9785000000002", "Солярис", "Философская фантастика",
+        ("aaaa0002-0002-0002-0002-000000000002", "9785000000002", "Солярис", "Философская фантастика",
          "22222222-2222-2222-2222-222222222222", "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", 700.0),
-    ]:
-        # получаем имя автора для нормализации
+    ]
+    for book_id, isbn, title, desc, author_id, genre_id, price in seed_books:
         async with conn.execute("SELECT name FROM authors WHERE id = ?", (author_id,)) as cur:
             author_row = await cur.fetchone()
         author_name = author_row["name"] if author_row else ""
-
         await conn.execute(
             "INSERT INTO books (id, isbn, title, title_lower, description, author_id, "
             "author_name_lower, genre_id, price, currency, cover_url, active, created_at, updated_at) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (str(uuid.uuid4()), isbn, title, title.lower(), desc, author_id,
+            (book_id, isbn, title, title.lower(), desc, author_id,
              author_name.lower(), genre_id, price,
              "RUB", f"http://minio.local/covers/{isbn}.jpg", 1, now, now),
         )
