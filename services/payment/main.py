@@ -1,5 +1,3 @@
-import hashlib
-import hmac
 import logging
 import os
 import uuid
@@ -19,6 +17,9 @@ import storage
 from models import (
     CreatePaymentRequest, CreateRefundRequest, Payment, Refund, WebhookPayload,
 )
+
+from security import verify_webhook_signature
+
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 logger = logging.getLogger("payment-service")
@@ -168,8 +169,7 @@ async def handle_webhook(
     x_signature: str = Header(..., alias="X-Signature"),
 ):
     raw = await request.body()
-    expected = hmac.new(WEBHOOK_SECRET.encode(), raw, hashlib.sha256).hexdigest()
-    if not hmac.compare_digest(expected, x_signature):
+    if not verify_webhook_signature(WEBHOOK_SECRET, raw, x_signature):
         raise ProblemException(401, "Invalid signature", None,
                                type_="https://bookstore.local/errors/unauthorized")
 

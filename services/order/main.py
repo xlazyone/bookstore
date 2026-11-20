@@ -189,13 +189,22 @@ async def lifespan(app: FastAPI):
     await broker.connect()
     app.state.broker = broker
 
-    async def completed_handler(env): await _on_payment_completed(app, env)
-    async def failed_handler(env): await _on_payment_failed(app, env)
-    async def refunded_handler(env): await _on_payment_refunded(app, env)
+    async def payment_event_handler(envelope: dict) -> None:
+        event_type = envelope.get("eventType")
+        if event_type == "payment.completed":
+            await _on_payment_completed(app, envelope)
+        elif event_type == "payment.failed":
+            await _on_payment_failed(app, envelope)
+        elif event_type == "payment.refunded":
+            await _on_payment_refunded(app, envelope)
+        else:
+            logger.warning("Unknown payment event: %s", event_type)
 
-    await broker.subscribe(QUEUE_PAYMENT, ["payment.completed"], completed_handler)
-    await broker.subscribe(QUEUE_PAYMENT, ["payment.failed"], failed_handler)
-    await broker.subscribe(QUEUE_PAYMENT, ["payment.refunded"], refunded_handler)
+    await broker.subscribe(
+        QUEUE_PAYMENT,
+        ["payment.completed", "payment.failed", "payment.refunded"],
+        payment_event_handler,
+    )
 
     logger.info("order-service started")
     yield

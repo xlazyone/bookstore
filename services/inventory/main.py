@@ -79,18 +79,19 @@ async def lifespan(app: FastAPI):
     await broker.connect()
     app.state.broker = broker
 
-    async def order_confirmed_handler(env): await _on_order_confirmed(broker, env)
-    async def order_cancelled_handler(env): await _on_order_cancelled(broker, env)
+    async def order_event_handler(envelope: dict) -> None:
+        event_type = envelope.get("eventType")
+        if event_type == "order.confirmed":
+            await _on_order_confirmed(broker, envelope)
+        elif event_type in ("order.cancelled", "order.expired"):
+            await _on_order_cancelled(broker, envelope)
+        else:
+            logger.warning("Unknown order event: %s", event_type)
 
     await broker.subscribe(
         QUEUE_NAME,
-        ["order.confirmed"],
-        order_confirmed_handler,
-    )
-    await broker.subscribe(
-        QUEUE_NAME,
-        ["order.cancelled", "order.expired"],
-        order_cancelled_handler,
+        ["order.confirmed", "order.cancelled", "order.expired"],
+        order_event_handler,
     )
 
     stop = asyncio.Event()
