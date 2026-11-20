@@ -127,7 +127,39 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
+  order-service:
+    build:
+      context: .
+      dockerfile: services/order/Dockerfile
+    container_name: bookstore-order
+    hostname: order-service
+    ports:
+      - "8003:8003"
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      ORDER_DB_DIR: /app/order/data
+      CATALOG_URL: http://catalog-service:8001
+      INVENTORY_URL: http://inventory-service:8002
+      PAYMENT_URL: http://payment-service:8004
+      RESERVATION_TTL_MINUTES: "15"
+    volumes:
+      - order-data:/app/order/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      catalog-service:
+        condition: service_started
+      inventory-service:
+        condition: service_started
+      payment-service:
+        condition: service_started
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
 volumes:
   catalog-data:
   inventory-data:
   payment-data:
+  order-data:
