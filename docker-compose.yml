@@ -158,8 +158,30 @@ services:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
 
+  review-service:
+    build:
+      context: .
+      dockerfile: services/review/Dockerfile
+    container_name: bookstore-review
+    hostname: review-service
+    ports:
+      - "8005:8005"
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      REVIEW_DB_DIR: /app/review/data
+    volumes:
+      - review-data:/app/review/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+
 volumes:
   catalog-data:
   inventory-data:
   payment-data:
   order-data:
+  review-data:
