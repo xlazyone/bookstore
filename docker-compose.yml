@@ -178,6 +178,32 @@ services:
     logging:
       driver: json-file
       options: { max-size: "10m", max-file: "3" }
+      
+  notification-service:
+    build:
+      context: .
+      dockerfile: services/notification/Dockerfile
+    container_name: bookstore-notification
+    hostname: notification-service
+    ports:
+      - "8006:8006"
+    environment:
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672/
+      NOTIFICATION_DB_DIR: /app/notification/data
+      SMTP_HOST: mailhog
+      SMTP_PORT: "1025"
+      SMTP_FROM: noreply@bookstore.local
+    volumes:
+      - notification-data:/app/notification/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mailhog:
+        condition: service_started
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
 
 volumes:
   catalog-data:
@@ -185,3 +211,4 @@ volumes:
   payment-data:
   order-data:
   review-data:
+  notification-data:
