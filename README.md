@@ -7,6 +7,7 @@
 3. [Выбор ПО](#3-выбор-по)
 4. [Схемы взаимодействий](#4-схемы-взаимодействий)
 5. [Контракты API](#5-контракты-api)
+6. [«Реализация (ЛР4)»](#6-реализация-лр4).
 
 ---
 
@@ -309,6 +310,22 @@
 | **MinIO** | catalog | Обложки книг – бинарные объекты. Хранить их в PostgreSQL (BYTEA) является антипаттерном, который раздувает БД, ломает бэкапы. |
 | **MailHog** | notification (**только dev-окружение**) | Реальная отправка email в учебном проекте небезопасна. MailHog перехватывает SMTP-трафик и показывает письма в веб-интерфейсе – можно проверить шаблоны, не отправляя ничего наружу. В проде заменяется на SendGrid / свой SMTP; абстракция в коде одна – SMTP-клиент. |
 
+### 3.1.1. Фактический стек ЛР4 (учебная реализация)
+
+По согласованию с преподавателем инфраструктурные компоненты заменены упрощёнными
+аналогами – фокус ЛР4 на **взаимодействиях между сервисами**, а не на инфраструктуре:
+
+| Проектный (production) | В ЛР4 | Причина |
+|------------------------|-------|---------|
+| PostgreSQL (на сервис) | **SQLite** (файл на сервис) | разрешено, проще локальный запуск |
+| MongoDB (review, notification) | **SQLite** | то же |
+| Redis (кэш catalog, TTL inventory) | **фоновый TTL-таск** в inventory | Redis-кэш не влияет на контракты |
+| Keycloak (JWT) | **мок**: `X-User-Id`/`X-Roles` из заголовков | разрешено, аутентификация не фокус ЛР4 |
+| Nginx (Gateway) | **FastAPI-прокси** | тот же функционал маршрутизации, проще для отчёта |
+| ЮKassa | **mock-payment-gateway** (FastAPI) | разрешено, шлёт реальные webhook'и через 3 с |
+| RabbitMQ | **RabbitMQ** (как в проекте) | ключевой элемент async-взаимодействий |
+| MailHog | **MailHog** (как в проекте) | dev-провайдер, реальный SMTP |
+
 ### 3.2. Отвергнутые варианты
 
 | Что рассматривали | Почему отказались |
@@ -456,3 +473,239 @@
 | `stock.reservation.expired`| `inventory` | inventory-service | order | `#/components/messages/StockReservationExpired` |
 | `review.published` | `reviews` | review-service | notification | `#/components/messages/ReviewPublished` |
 
+## 6. Реализация (ЛР4)
+
+### 6.1. Структура проекта
+
+```text
+bookstore/
+├── api/                     # OpenAPI и AsyncAPI из ЛР3
+├── docs/                    # архитектурные схемы + demo-scenarios.md
+├── gateway/                 # API Gateway (FastAPI-прокси, порт 8080)
+├── mocks/payment-gateway/   # мок внешнего платёжного шлюза (порт 8090)
+├── services/
+│   ├── catalog/             # порт 8001
+│   ├── inventory/           # порт 8002
+│   ├── order/               # порт 8003 – оркестратор саги
+│   ├── payment/             # порт 8004
+│   ├── review/              # порт 8005
+│   └── notification/        # порт 8006
+├── shared/                  # общий код: problem, correlation, broker, idempotency, auth
+├── tests/
+│   ├── unit/                # 18 тестов
+│   └── integration/         # 6 тестов
+├── scripts/smoke_test.sh    # end-to-end smoke
+├── postman/                 # коллекция запросов
+├── docker-compose.yml
+└── README.md
+```
+
+### 6.2. Реализованные сервисы
+
+| Сервис | Порт | Хранилище | Роль |
+|--------|------|-----------|------|
+| `catalog-service` | 8001 | SQLite | книги, авторы, жанры, поиск |
+| `inventory-service` | 8002 | SQLite + фоновый TTL | остатки, резервы на 15 мин |
+| `order-service` | 8003 | SQLite | корзина, заказы, **оркестратор саги** |
+| `payment-service` | 8004 | SQLite | платежи, вебхуки (HMAC), возвраты |
+| `review-service` | 8005 | SQLite | отзывы, модерация, рейтинг |
+| `notification-service` | 8006 | SQLite | журнал отправок, SMTP через MailHog |
+| `api-gateway` | 8080 | – | единая точка входа, мок JWT |
+| `mock-payment-gateway` | 8090 | – | мок ЮKassa, шлёт вебхуки |
+
+### 6.3. Реализованные взаимодействия
+
+#### 6.3.1. Синхронные (REST)
+
+| № | Инициатор → Получатель | Эндпоинт |
+|---|------------------------|----------|
+| 1 | order → catalog | `GET /internal/v1/books:batch` |
+| 2 | order → inventory | `POST /internal/v1/reservations` (Idempotency-Key) |
+| 3 | order → payment | `POST /internal/v1/payments` (Idempotency-Key) |
+| 4 | order → inventory | `DELETE /internal/v1/reservations/{orderId}` (компенсация) |
+| 5 | order → payment | `POST /internal/v1/refunds` (компенсация) |
+| 6 | payment → mock-psp | `POST /payments` |
+| 7 | mock-psp → payment | `POST /api/v1/payments/webhook` (HMAC) |
+| 8 | notification → MailHog | SMTP |
+
+#### 6.3.2. Асинхронные (RabbitMQ, topic exchange `bookstore`)
+
+| Событие | Издатель | Подписчики |
+|---------|----------|------------|
+| `order.created` | order | – |
+| `order.confirmed` | order | inventory, review, notification |
+| `order.cancelled` | order | inventory, notification |
+| `order.expired` | order | payment, notification |
+| `payment.completed` | payment | order, notification |
+| `payment.failed` | payment | order, notification |
+| `payment.refunded` | payment | order |
+| `stock.reserved` / `stock.released` / `stock.reservation.expired` | inventory | – |
+| `review.published` | review | notification |
+| `notification.sent` / `notification.failed` | notification | – |
+
+#### 6.3.3. Какие взаимодействия реальные, а какие – через моки
+
+| Взаимодействие | Статус | Что именно мокается / реально |
+|----------------|--------|------------------------------|
+| Клиент → Gateway → catalog / inventory / order / payment / review | **реально** | все сервисы запущены, HTTP-вызовы настоящие |
+| Gateway → проверка JWT (Keycloak) | **мок** | Keycloak не поднят; `shared/auth.py` берёт `X-User-Id`/`X-Roles` из заголовков |
+| order → catalog (`/internal/v1/books:batch`) | **реально** | HTTP-вызов между контейнерами |
+| order → inventory (`POST /internal/v1/reservations`, `DELETE`) | **реально** | HTTP-вызов + Idempotency-Key |
+| order → payment (`POST /internal/v1/payments`, `/refunds`) | **реально** | HTTP-вызов + Idempotency-Key |
+| payment → внешний платёжный шлюз | **мок** | `mocks/payment-gateway` – FastAPI-сервис, имитирует ЮKassa |
+| Внешний шлюз → payment (webhook) | **мок** | webhook шлёт `mock-payment-gateway` через 3 с после создания сессии; подпись HMAC-SHA256 проверяется по-настоящему |
+| Публикация/доставка событий через RabbitMQ | **реально** | RabbitMQ в контейнере, topic exchange `bookstore`, durable-очереди, ack/nack |
+| notification → email-провайдер | **реально SMTP / мок-провайдер** | SMTP-отправка настоящая, но получатель – MailHog (dev-замена SendGrid); письма перехватываются |
+| PostgreSQL / MongoDB / Redis | **заменены** | SQLite на сервис (разрешено преподавателем); TTL-резервы – фоновый таск inventory |
+
+### 6.4. Сага покупки
+
+**Happy path:** `POST /api/v1/orders` → order → catalog (цены) → inventory (резерв) →
+payment (платёж) → mock-psp (сессия) → webhook `SUCCEEDED` → `payment.completed` →
+order `CONFIRMED` → `order.confirmed` → inventory подтверждает резерв, review фиксирует
+verified purchase, notification шлёт 2 письма.
+
+**Failure path:** webhook `FAILED` → `payment.failed` → order `CANCELLED` +
+`DELETE` резерва в inventory → `order.cancelled` → inventory освобождает резерв,
+notification шлёт письма об ошибке и отмене.
+
+Подробнее – `docs/demo-scenarios.md`.
+
+### 6.5. Единая модель ошибок и идемпотентность
+
+- Все 4xx/5xx – **RFC 7807 Problem Details** (`application/problem+json`) с `type`, `title`, `status`, `detail`, `instance`, `correlationId`.
+- `Idempotency-Key` реализован в: `POST /api/v1/orders`, `POST /internal/v1/payments`, `POST /internal/v1/reservations`, `POST /internal/v1/refunds`, `POST /api/v1/books/{id}/reviews`.
+- Сквозная трассировка: `X-Correlation-Id` пробрасывается gateway → сервисы → события RabbitMQ (в `EventEnvelope.correlationId`).
+
+### 6.6. Локальный запуск
+
+**Требования:** Docker, Docker Compose v2.
+
+```bash
+git clone https://github.com/xlazyone/bookstore.git
+cd bookstore
+cp .env.example .env
+docker compose up -d --build
+sleep 30
+docker compose ps          # 10 контейнеров Up, rabbitmq healthy
+```
+
+**UI для отладки:**
+- RabbitMQ Management: `http://localhost:15672` (`guest` / `guest`)
+- MailHog: `http://localhost:8025`
+- Swagger каждого сервиса: `http://localhost:8001/docs`, `:8002/docs`, …, `:8006/docs`
+- Gateway health: `http://localhost:8080/health`
+
+### 6.7. Проверка сценариев
+
+Полный список – `docs/demo-scenarios.md`.
+
+Быстрая проверка «всё живое»:
+
+```bash
+./scripts/smoke_test.sh
+# ожидаем: SMOKE OK
+```
+
+Ручная проверка happy path (через gateway, как клиент):
+
+```bash
+BOOK="9a4d1e2c-6b7f-4a08-b3c5-0e1f2d3c4b5a"
+USER="00000000-0000-0000-0000-000000000001"
+
+curl -X POST http://localhost:8080/api/v1/cart/items \
+  -H "Content-Type: application/json" -H "X-User-Id: $USER" \
+  -d "{\"bookId\": \"$BOOK\", \"quantity\": 1}"
+
+OID=$(curl -s -X POST http://localhost:8080/api/v1/orders \
+  -H "Content-Type: application/json" -H "X-User-Id: $USER" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"currency":"RUB","simulatePayment":"SUCCESS"}' \
+  | python3 -c 'import sys,json; print(json.load(sys.stdin)["id"])')
+
+sleep 6
+curl http://localhost:8080/api/v1/orders/$OID -H "X-User-Id: $USER"
+# status: CONFIRMED
+```
+
+### 6.8. Тесты
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r shared/requirements.txt -r shared/requirements-dev.txt
+
+pytest tests/unit -v                          # 18 passed
+pytest tests/integration -v -m integration    # 6 passed (нужен запущенный стек)
+./scripts/smoke_test.sh                       # SMOKE OK
+```
+
+### 6.9. Postman (GUI)
+
+Коллекция: `postman/bookstore-lr4.postman_collection.json`.
+Окружение: `postman/bookstore-lr4.postman_environment.json`.
+
+**Импорт:**
+1. Открыть Postman → **Import** → **Files** → выбрать оба JSON-файла → Import.
+2. Справа сверху в выпадающем списке окружений выбрать **BookStore LR4**.
+3. Все запросы уже используют `{{baseUrl}}` = `http://localhost:8080`, `{{bookId}}`, `{{userId}}` из окружения.
+
+**Порядок демонстрации (папки коллекции):**
+
+1. **0. Health** → `GET /health` – Gateway жив.
+2. **1. Catalog** → `List books`, `Search books` – публичные эндпоинты.
+3. **2. Cart** → `Add to cart` – книга в корзине пользователя `{{userId}}`.
+4. **3. Order - happy path** → `Create order (SUCCESS)`:
+   - Pre-request script сам генерирует `Idempotency-Key`.
+   - Test script сохраняет `orderId` в окружение.
+   - В ответе `status: PENDING_PAYMENT`.
+5. **3. Order - happy path** → `Get order status` через 5–6 секунд – `status: CONFIRMED`.
+6. **4. Order - failure path** → `Create order (FAIL)` – новый заказ, через 6 с `CANCELLED`.
+7. **5. Reviews** → `Create review` → `List reviews` → `Moderate review (APPROVE)`.
+8. **6. Admin** → `Restock` (нужен `X-Roles: MANAGER`).
+9. **7. Error examples** → 404/403 в формате `application/problem+json`.
+
+**Как показать, что запрос реально получен сервисом** – параллельно открыть терминал:
+
+```bash
+# gateway – видит входящий запрос
+docker logs -f bookstore-gateway
+
+# order – сага, вызовы catalog/inventory/payment
+docker logs -f bookstore-order
+
+# inventory – резервы, подписка на order.confirmed/cancelled
+docker logs -f bookstore-inventory
+
+# payment – вызов mock PSP, webhook, публикация payment.*
+docker logs -f bookstore-payment
+
+# notification – письма
+docker logs -f bookstore-notification
+```
+
+В логах будет видно, например, для `Create order (SUCCESS)`:
+
+- `bookstore-gateway`: `PROXY POST /api/v1/orders -> order`
+- `bookstore-order`: `HTTP Request: GET http://catalog-service:8001/internal/v1/books:batch ... 200`,
+  `POST http://inventory-service:8002/internal/v1/reservations 201`,
+  `POST http://payment-service:8004/internal/v1/payments 201`,
+  `Published order.created`, `Saga started for order ...`
+- `bookstore-payment`: `HTTP Request: POST http://mock-payment-gateway:8080/payments 201`,
+  `Published payment.initiated`, через 3 с `Webhook ... -> COMPLETED, published payment.completed`
+- `bookstore-inventory`: `Published stock.reserved`, затем `Reservation ... confirmed by order.confirmed`
+- `bookstore-notification`: `Sent ORDER_CONFIRMED to ...`
+
+**Дополнительно – RabbitMQ UI** (`http://localhost:15672`):
+- **Queues** → `order.payment.events`, `inventory.order.events`, `notification.events`, `review.order.events` → `Consumers: 1` у каждой.
+- **Exchanges → bookstore → Bindings** – карта routing keys.
+- **Message rates** – видно publish/deliver/ack в реальном времени.
+
+**Дополнительно – MailHog** (`http://localhost:8025`): после `Create order (SUCCESS)` –
+2 письма (оплата получена + заказ подтверждён), после `FAIL` – 2 письма (ошибка + отмена).
+
+### 6.10. Что не реализовано / ограничения
+
+- `payment.*` события по контракту не содержат `userEmail` → notification шлёт письма на `user-unknown@example.com` (для `order.*` – корректный адрес).
+- `order-service` не подписан на `stock.reservation.expired` (по README – должен). TTL-резервы всё равно освобождаются фоновым таском inventory.
+- Keycloak заменён мок-заголовками; в production – JWT от Keycloak через Nginx.
+- MinIO (обложки книг) не поднят, `coverUrl` – заглушка.
