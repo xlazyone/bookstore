@@ -1,0 +1,16 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Dev-секреты и тестовые фикстуры"
+paths = [
+  '''\.env\.example''',
+  '''tests/.*''',
+  '''docs/.*''',
+  '''README\.md''',
+  '''\.github/.*''',
+]
+regexes = [
+  '''dev-secret-change-me''',
+  '''guest:guest''',
+]

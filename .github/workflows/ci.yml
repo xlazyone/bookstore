@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+
+  # 1. Сканирование секретов в коде и истории
+  secrets-scan:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # 2. Установка зависимостей + unit-тесты
+  lint-and-test:
+    name: lint-and-test
+    needs: secrets-scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            shared/requirements.txt
+            shared/requirements-dev.txt
+      - name: Install dependencies
+        run: pip install -r shared/requirements.txt -r shared/requirements-dev.txt
+      - name: Unit tests
+        run: pytest tests/unit -v
+
+  # 3. Сборка Docker-образов (матрица по 8 сервисам), без публикации
+  docker-build:
+    name: build (${{ matrix.name }})
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: catalog,              context: services/catalog }
+          - { name: inventory,            context: services/inventory }
+          - { name: order,                context: services/order }
+          - { name: payment,              context: services/payment }
+          - { name: review,               context: services/review }
+          - { name: notification,         context: services/notification }
+          - { name: gateway,              context: gateway }
+          - { name: mock-payment-gateway, context: mocks/payment-gateway }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build ${{ matrix.name }}
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.context }}/Dockerfile
+          push: false
+          tags: bookstore-${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+
+  # 4. Интеграционные тесты + smoke на поднятом через compose стеке
+  integration-tests:
+    name: integration-tests
+    needs: docker-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: |
+            shared/requirements.txt
+            shared/requirements-dev.txt
+      - name: Install deps
+        run: pip install -r shared/requirements.txt -r shared/requirements-dev.txt
+      - name: Prepare .env
+        run: cp .env.example .env
+      - name: docker compose up
+        run: docker compose up -d --build
+      - name: Wait for gateway
+        run: |
+          echo "Ждём gateway (до 3 минут)..."
+          for i in $(seq 1 90); do
+            if curl -sf http://localhost:8080/health > /dev/null; then
+              echo "gateway ready after ${i} attempts"
+              break
+            fi
+            sleep 2
+          done
+          curl -sf http://localhost:8080/health
+      - name: Show compose ps
+        run: docker compose ps
+      - name: Integration tests
+        run: pytest tests/integration -v -m integration
+      - name: Smoke test
+        run: ./scripts/smoke_test.sh
+      - name: Compose logs (on failure)
+        if: failure()
+        run: |
+          docker compose ps
+          docker compose logs --tail=200
+      - name: Compose down
+        if: always()
+        run: docker compose down -v
