@@ -1,5 +1,8 @@
 # BookStore – микросервисный онлайн-магазин книг
 
+[![CI](https://github.com/xlazyone/bookstore/actions/workflows/ci.yml/badge.svg)](https://github.com/xlazyone/bookstore/actions/workflows/ci.yml)
+[![CD](https://github.com/xlazyone/bookstore/actions/workflows/cd.yml/badge.svg)](https://github.com/xlazyone/bookstore/actions/workflows/cd.yml)
+
 ## Содержание
 
 1. [Анализ предметной области](#1-анализ-предметной-области)
@@ -8,6 +11,7 @@
 4. [Схемы взаимодействий](#4-схемы-взаимодействий)
 5. [Контракты API](#5-контракты-api)
 6. [«Реализация (ЛР4)»](#6-реализация-лр4).
+7. [«CI-CD (ЛР5)»](#7-ci-cd-лр5).
 
 ---
 
@@ -709,3 +713,66 @@ docker logs -f bookstore-notification
 - `order-service` не подписан на `stock.reservation.expired` (по README – должен). TTL-резервы всё равно освобождаются фоновым таском inventory.
 - Keycloak заменён мок-заголовками; в production – JWT от Keycloak через Nginx.
 - MinIO (обложки книг) не поднят, `coverUrl` – заглушка.
+
+---
+
+## 7. CI-CD (ЛР5)
+
+Полная документация: [`docs/cicd.md`](docs/cicd.md).
+
+### 7.1. Платформа
+
+**GitHub Actions** — репозиторий уже на GitHub, hosted runners, бесплатно для public,
+встроенный `GITHUB_TOKEN`, секреты через GitHub Secrets (не в коде).
+
+### 7.2. Пайплайны
+
+| Workflow | Файл | Триггер | Что делает |
+|----------|------|---------|------------|
+| CI | [`.github/workflows/ci.yml`](.github/workflows/ci.yml) | push в main, PR в main, вручную | gitleaks → unit-тесты → сборка 8 образов (матрица) → интеграционные тесты + smoke на `docker compose` |
+| CD | [`.github/workflows/cd.yml`](.github/workflows/cd.yml) | push в main, тег `v*.*.*`, вручную | сборка и публикация 8 образов в Docker Hub (`latest`, `sha-<short>`, `v*.*.*`) |
+
+### 7.3. Этапы CI
+
+1. **`secrets-scan`** — gitleaks, вся история коммитов, SARIF-отчёт.
+2. **`lint-and-test`** — Python 3.11 + кэш pip, `pytest tests/unit` (**18 тестов**).
+3. **`docker-build`** — матрица **8 сервисов** (`catalog, inventory, order, payment, review, notification, gateway, mock-payment-gateway`), BuildKit-кэш через GHA.
+4. **`integration-tests`** — `docker compose up` всего стека, ожидание Gateway, `pytest tests/integration` (**6 тестов**) + `scripts/smoke_test.sh`. При падении — логи compose; всегда — `docker compose down -v`.
+
+Зависимости: `secrets-scan → lint-and-test → docker-build → integration-tests`. Красный unit останавливает всё дальше.
+
+### 7.4. Этапы CD
+
+- Матрица 8 сервисов → `docker/build-push-action` с `push: true`.
+- Теги через `docker/metadata-action`:
+  - `latest` — только на push в main,
+  - `v1.2.3` — на тег `v*.*.*`,
+  - `sha-abc1234` — на каждый коммит (для откатов).
+- Реестр: Docker Hub, `docker.io/<username>/bookstore-<service>`.
+
+### 7.5. Секреты
+
+| Секрет | Где | Назначение |
+|--------|-----|------------|
+| `GITHUB_TOKEN` | Автоматически | gitleaks, checkout |
+| `DOCKERHUB_USERNAME` | Repo Settings → Secrets → Actions | Логин Docker Hub |
+| `DOCKERHUB_TOKEN` | Repo Settings → Secrets → Actions | Access Token, Read & Write |
+
+В коде секретов нет — проверяется в `secrets-scan`.
+
+### 7.6. Ссылки
+
+- **CI workflow:** https://github.com/xlazyone/bookstore/actions/workflows/ci.yml
+- **CD workflow:** https://github.com/xlazyone/bookstore/actions/workflows/cd.yml
+- **Все прогоны:** https://github.com/xlazyone/bookstore/actions
+- **Образы:** https://hub.docker.com/u/<username> (заменить `<username>` на свой)
+- **Demo failure:** см. `docs/cicd.md`, раздел 7
+
+### 7.7. Локальная проверка
+
+**Unit-тесты** (работает без интернета):
+
+```bash
+python3 -m venv .venv && source .venv/bin/activate
+pip install -r shared/requirements.txt -r shared/requirements-dev.txt
+pytest tests/unit -v     # 18 passed
