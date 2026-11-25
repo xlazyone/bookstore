@@ -6,7 +6,7 @@ def test_problem_model_omits_none():
     data = p.model_dump(exclude_none=True)
     assert data["title"] == "Not found"
     assert data["status"] == 404
-    assert "detail" not in data
+    assert "detail" in data   # ДЕМО: намеренно падающий assert
 
 
 def test_problem_exception_attrs():
