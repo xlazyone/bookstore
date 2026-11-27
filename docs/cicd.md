@@ -108,13 +108,13 @@
 - **CI:** [`https://github.com/xlazyone/bookstore/actions/workflows/ci.yml`](https://github.com/xlazyone/bookstore/actions/workflows/ci.yml)
 - **CD:** [`https://github.com/xlazyone/bookstore/actions/workflows/cd.yml`](https://github.com/xlazyone/bookstore/actions/workflows/cd.yml)
 
-![CI success](../pictures/screenshots/ci-success-1.png)
-![CI success](../pictures/screenshots/ci-success-2.png)
-![CI success](../pictures/screenshots/ci-success-3.png)
+![CI success](pictures/screenshots/ci-success-1.png)
+![CI success](pictures/screenshots/ci-success-2.png)
+![CI success](pictures/screenshots/ci-success-3.png)
 
-![CD success](../pictures/screenshots/cd-success-1.png)
-![CD success](../pictures/screenshots/cd-success-2.png)
-![CD success](../pictures/screenshots/cd-success-3.png)
+![CD success](pictures/screenshots/cd-success-1.png)
+![CD success](pictures/screenshots/cd-success-2.png)
+![CD success](pictures/screenshots/cd-success-3.png)
 
 ## 7. Демонстрация неуспешного прогона
 
@@ -125,13 +125,13 @@
 - `gitleaks` ✅ → `lint-and-test` ❌ (`1 failed, 17 passed`).
 - `docker-build` × 8 и `integration-tests` — `skipped`, потому что `needs: lint-and-test`.
 
-![CI failure](../pictures/screenshots/ci-failure-1.png)
-![CI failure](../pictures/screenshots/ci-failure-2.png)
-![CI failure](../pictures/screenshots/ci-failure-3.png)
+![CI failure](pictures/screenshots/ci-failure-1.png)
+![CI failure](pictures/screenshots/ci-failure-2.png)
+![CI failure](pictures/screenshots/ci-failure-3.png)
 
 После демонстрации PR закрыт без merge, ветка удалена.
 
-![PR failure](../pictures/screenshots/pr-failure.png)
+![PR failure](pictures/screenshots/pr-failure.png)
 
 **Вывод:** пайплайн корректно останавливает дорогие этапы (сборка образов, интеграционные тесты) при падении unit-тестов.
 
@@ -178,7 +178,11 @@ docker compose down -v
 | gateway | `docker.io/<username>/bookstore-gateway:latest` |
 | mock-payment-gateway | `docker.io/<username>/bookstore-mock-payment-gateway:latest` |
 
+[!Docker Hub Repositories](pictures/screenshots/docker-hub-repositories.png)
+
 Каждый образ также тегируется `sha-<short>` (для откатов) и `v*.*.*` при push тега.
+
+[!Docker Hub Tags](pictures/screenshots/docker-hub-tags.png)
 
 ## 10. Ограничения
 
